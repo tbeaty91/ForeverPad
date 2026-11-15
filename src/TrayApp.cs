@@ -274,6 +274,8 @@ namespace ForeverPad
             Process.Start("explorer.exe", "\"" + s.WowDir + "\"");
             var store = Profiles.StoreRoot(s.WowDir);
             if (Directory.Exists(store)) Process.Start("explorer.exe", "\"" + store + "\"");
+            var backups = Profiles.BackupRoot(s.WowDir);
+            if (Directory.Exists(backups)) Process.Start("explorer.exe", "\"" + backups + "\"");
         }
 
         public void Quit()

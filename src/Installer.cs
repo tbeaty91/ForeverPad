@@ -132,7 +132,7 @@ namespace ForeverPad
             var s = Settings.Load();
             var ok = MessageBox.Show(
                 "Uninstall ForeverPad?\n\nYour WoW folders are left alone. If another profile is active it switches back to Normal first. " +
-                "Your other profiles stay in the _forever__profiles folder next to _forever_, so you can delete it yourself if you want." +
+                "Your other profiles stay in the _forever__profiles folder (and Normal's backups in _forever__backups) next to _forever_, so you can delete them yourself if you want." +
                 "\n\nThe \"" + Steam.ShortcutName + "\" entry in Steam stays too; remove it from Steam if you don't want it.",
                 "ForeverPad", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
             if (ok != DialogResult.OK) return 1;

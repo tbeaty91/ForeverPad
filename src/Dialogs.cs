@@ -347,7 +347,8 @@ namespace ForeverPad
                 if (Sel == null || pad.Checked == Profiles.IsPad(s.WowDir, Sel)) return;
                 Do(() => Profiles.SetGamepad(s.WowDir, Sel, pad.Checked));
             };
-            info = AddLabel("", 282, 166, 222, 100, true);
+            info = AddLabel("", 282, 166, 222, 80, true);
+            AddButton("Restore Normal backup…", 16, 296, 200, Theme.Panel, (o, e) => RestoreBackup());
             AddButton("Close", 414, 296, 90, Theme.Panel, (o, e) => Close());
             Reload(Profiles.Active(s.WowDir));
         }
@@ -380,6 +381,25 @@ namespace ForeverPad
                 ? (n == Profiles.Normal ? "Your main setup. Steam sessions return here." : "Used by the Steam shortcut.") + " Built in, so it can't be renamed or deleted."
                 : active ? "Active now. Switch to another profile to rename or delete it." : "";
             if (running) info.Text = "WoW Forever is running: close it to switch.";
+        }
+
+        void RestoreBackup()
+        {
+            string root = Profiles.BackupRoot(s.WowDir);
+            if (!Directory.Exists(root)) { MessageBox.Show(this, "No backups yet. One is made every time you switch away from Normal.", "ForeverPad"); return; }
+            using (var f = new OpenFileDialog { InitialDirectory = root, Filter = "Normal backups (*.zip)|Normal-WTF-*.zip", Title = "Pick a backup of Normal's WTF folder" })
+            {
+                if (f.ShowDialog(this) != DialogResult.OK) return;
+                var r = MessageBox.Show(this, "Restore Normal's settings, keybinds and addon data from\n" + Path.GetFileName(f.FileName) + "?\n\n" +
+                    "Your current WTF folder is kept (renamed to WTF-before-restore-…), not deleted.", "ForeverPad", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+                if (r != DialogResult.OK) return;
+                try
+                {
+                    var aside = Profiles.RestoreNormal(s, f.FileName);
+                    MessageBox.Show(this, "Restored." + (aside != null ? "\n\nThe WTF you had before is in " + Path.GetFileName(aside) + " inside _forever_." : ""), "ForeverPad");
+                }
+                catch (Exception ex) { MessageBox.Show(this, "Restore failed, nothing changed: " + ex.Message, "ForeverPad"); }
+            }
         }
 
         void NewFrom(string src)

@@ -28,6 +28,51 @@ namespace ForeverPad
             return Path.Combine(Path.GetDirectoryName(d), Path.GetFileName(d) + "_profiles");
         }
 
+        // Zipped copies of Normal's WTF, taken every time you switch away from it.
+        public static string BackupRoot(string wowDir)
+        {
+            var d = wowDir.TrimEnd('\\', '/');
+            return Path.Combine(Path.GetDirectoryName(d), Path.GetFileName(d) + "_backups");
+        }
+        const int KeepBackups = 15;
+
+        static void BackupNormalWtf(string wowDir)
+        {
+            string wtf = Path.Combine(wowDir, "WTF");
+            if (!Directory.Exists(wtf)) return;
+            string root = BackupRoot(wowDir);
+            Directory.CreateDirectory(root);
+            string zip = Path.Combine(root, "Normal-WTF-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".zip");
+            System.IO.Compression.ZipFile.CreateFromDirectory(wtf, zip, System.IO.Compression.CompressionLevel.Fastest, true);
+            foreach (var old in Directory.GetFiles(root, "Normal-WTF-*.zip").OrderByDescending(f => f).Skip(KeepBackups))
+            {
+                try { File.Delete(old); } catch { }
+            }
+        }
+
+        // Put a backup back. Only while Normal is active and the game is closed.
+        // The current WTF isn't deleted: it's renamed to WTF-before-restore-<time>.
+        public static string RestoreNormal(Settings s, string zip)
+        {
+            if (Active(s.WowDir) != Normal) throw new InvalidOperationException("Switch to Normal first, then restore.");
+            if (GameRunning(s)) throw new InvalidOperationException("Close WoW Forever first.");
+            string wtf = Path.Combine(s.WowDir, "WTF");
+            string aside = null;
+            if (Directory.Exists(wtf))
+            {
+                aside = Path.Combine(s.WowDir, "WTF-before-restore-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
+                Directory.Move(wtf, aside);
+            }
+            try { System.IO.Compression.ZipFile.ExtractToDirectory(zip, s.WowDir); }
+            catch
+            {
+                try { if (Directory.Exists(wtf)) Directory.Delete(wtf, true); } catch { }
+                if (aside != null) Directory.Move(aside, wtf);
+                throw;
+            }
+            return aside;
+        }
+
         static string MarkerPath(string wowDir) { return Path.Combine(StoreRoot(wowDir), "active.txt"); }
 
         public static string Active(string wowDir)
@@ -253,6 +298,17 @@ namespace ForeverPad
                     SetGamepad(wow, Controller, true);
                 }
 
+                // Safety net: snapshot Normal's settings, keybinds and addon data
+                // before it's moved anywhere. No backup, no switch.
+                if (cur == Normal)
+                {
+                    try { BackupNormalWtf(wow); }
+                    catch (Exception ex)
+                    {
+                        throw new InvalidOperationException("Didn't switch: couldn't back up Normal's WTF folder first (" + ex.Message + ").", ex);
+                    }
+                }
+
                 var done = new List<string[]>(); // {from, to}
                 try
                 {
@@ -287,7 +343,17 @@ namespace ForeverPad
             string cfg = Path.Combine(wow, "WTF", "Config.wtf");
             if (pad == true) SetCvar(cfg, "GamePadEnable", "1");
             else if (pad == false && File.Exists(cfg)) SetCvar(cfg, "GamePadEnable", "0");
+
+            // WoW can keep keybinds, macros and settings on Blizzard's servers and
+            // pull/push them on login. Left on, a test profile could write its
+            // keybinds to the server and Normal would download them next time.
+            // Every profile except Normal keeps those local instead.
+            if (target != Normal)
+                foreach (var cv in SyncCvars) SetCvar(cfg, cv, "0");
         }
+
+        static readonly string[] SyncCvars = {
+            "synchronizeSettings", "synchronizeConfig", "synchronizeBindings", "synchronizeMacros", "synchronizeChatFrames" };
 
         static void Move(string from, string to, List<string[]> done)
         {

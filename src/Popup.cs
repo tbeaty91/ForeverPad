@@ -61,6 +61,7 @@ namespace ForeverPad
         readonly ModeSwitch sw = new ModeSwitch();
         readonly Label status = new Label();
         readonly Label title = new Label();
+        public DateTime HiddenAt = DateTime.MinValue;
 
         public Popup(TrayApp app)
         {
@@ -95,7 +96,7 @@ namespace ForeverPad
             x = AddLink("Open folders", x, () => { Hide(); app.OpenFolders(); });
             AddLink("Quit", x, () => app.Quit());
 
-            Deactivate += (s, e) => Hide();
+            Deactivate += (s, e) => { HiddenAt = DateTime.Now; Hide(); };
         }
 
         int AddLink(string text, int x, Action click)

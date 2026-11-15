@@ -45,6 +45,8 @@ namespace ForeverPad
             {
                 if (e.Button != MouseButtons.Left) return;
                 if (popup.Visible) { popup.Hide(); return; }
+                // Clicking the icon deactivates (and hides) the popup first; don't reopen it.
+                if ((DateTime.Now - popup.HiddenAt).TotalMilliseconds < 400) return;
                 Sync(true);
                 popup.ShowNearTray();
             };

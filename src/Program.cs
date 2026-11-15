@@ -1,0 +1,130 @@
+// ForeverPad — tray toggle between a Normal and a Controller WoW Forever setup.
+//
+//   ForeverPad.exe                     tray icon (one instance)
+//   ForeverPad.exe --play controller   what the Steam shortcut runs: switch, launch,
+//                                      wait for the game to close, switch back
+//   ForeverPad.exe --switch normal|controller
+using System;
+using System.Diagnostics;
+using System.Reflection;
+using System.Threading;
+using System.Windows.Forms;
+
+[assembly: AssemblyTitle("ForeverPad")]
+[assembly: AssemblyProduct("ForeverPad")]
+[assembly: AssemblyVersion("1.0.0.0")]
+
+namespace ForeverPad
+{
+    static class Program
+    {
+        public static string ExePath { get { return Application.ExecutablePath; } }
+
+        [STAThread]
+        static int Main(string[] args)
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+            string arg = args.Length > 1 ? args[1].ToLowerInvariant() : "";
+
+            if (mode == "--play") return Play(arg == "normal" ? Profiles.Normal : Profiles.Controller);
+            if (mode == "--switch")
+            {
+                try { Profiles.Switch(Settings.Load(), arg == "controller" ? Profiles.Controller : Profiles.Normal); return 0; }
+                catch (Exception ex) { MessageBox.Show(ex.Message, "ForeverPad"); return 1; }
+            }
+
+            bool first;
+            using (var m = new Mutex(true, @"Local\ForeverPad.Tray", out first))
+            {
+                if (!first)
+                {
+                    MessageBox.Show("ForeverPad is already running. Its icon is in the taskbar tray (check the ^ overflow).", "ForeverPad");
+                    return 0;
+                }
+                Application.Run(new TrayApp());
+                GC.KeepAlive(m);
+            }
+            return 0;
+        }
+
+        // ---- Steam launch: switch -> run game -> wait -> switch back ----
+        static int Play(string profile)
+        {
+            var s = Settings.Load();
+            if (!s.IsReady)
+            {
+                MessageBox.Show("ForeverPad doesn't know where WoW Forever is yet. Run ForeverPad on the PC once and set the folder in Settings.", "ForeverPad");
+                return 1;
+            }
+
+            var icon = new NotifyIcon { Icon = Icons.For(profile, false), Text = "WoW Forever: " + profile + " session", Visible = true };
+            int code = 0;
+            var ctx = new ApplicationContext();
+            var worker = new Thread(() =>
+            {
+                try { code = PlayWorker(s, profile); }
+                catch (Exception ex) { code = 1; MessageBox.Show(ex.Message, "ForeverPad"); }
+                finally { ctx.ExitThread(); }
+            });
+            worker.IsBackground = true;
+            worker.Start();
+            Application.Run(ctx);
+            icon.Visible = false;
+            icon.Dispose();
+            return code;
+        }
+
+        static int PlayWorker(Settings s, string profile)
+        {
+            string before = Profiles.Active(s.WowDir);
+
+            if (Profiles.GameRunning(s))
+            {
+                if (before != profile)
+                {
+                    MessageBox.Show("WoW Forever is already running in " + before + " mode. Close it and launch again.", "ForeverPad");
+                    return 1;
+                }
+                // Already running in the right mode: keep Steam's session alive until it closes.
+                WaitForGameExit(s);
+                return 0;
+            }
+
+            Profiles.Switch(s, profile);
+            Profiles.LaunchGame(s);
+
+            // Wait for the game to show up (it may relaunch itself), then for it to close.
+            var sw = Stopwatch.StartNew();
+            while (!Profiles.GameRunning(s) && sw.Elapsed.TotalSeconds < 120) Thread.Sleep(500);
+            WaitForGameExit(s);
+
+            if (s.RestoreAfterPlay && before != profile)
+            {
+                for (int i = 0; ; i++)
+                {
+                    try { Profiles.Switch(s, before); break; }
+                    catch (Exception)
+                    {
+                        if (i >= 9) throw;
+                        Thread.Sleep(2000); // files can stay locked for a moment after exit
+                    }
+                }
+            }
+            return 0;
+        }
+
+        static void WaitForGameExit(Settings s)
+        {
+            // Require a few quiet seconds in a row so a self-restart doesn't count as quitting.
+            int quiet = 0;
+            while (quiet < 3)
+            {
+                Thread.Sleep(1000);
+                quiet = Profiles.GameRunning(s) ? 0 : quiet + 1;
+            }
+        }
+    }
+}

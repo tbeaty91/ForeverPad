@@ -261,6 +261,7 @@ namespace ForeverPad
         {
             if (!s.IsReady) { ShowSettings(); return; }
             var form = new DarkReport("CurseForge diagnostic", "Searching CurseForge's folders… (this can take a minute)");
+            var handle = form.Handle; // create the window now so the result can always be delivered
             var t = new System.Threading.Thread(() =>
             {
                 string text;

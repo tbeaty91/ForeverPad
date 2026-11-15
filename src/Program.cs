@@ -95,12 +95,34 @@ namespace ForeverPad
             }
 
             Profiles.Switch(s, profile);
-            Profiles.LaunchGame(s);
 
-            // Wait for the game to show up (it may relaunch itself), then for it to close.
-            var sw = Stopwatch.StartNew();
-            while (!Profiles.GameRunning(s) && sw.Elapsed.TotalSeconds < 120) Thread.Sleep(500);
-            WaitForGameExit(s);
+            bool viaBnet = s.UseBattleNet;
+            bool bnetWasOpen = viaBnet && Profiles.BattleNetProcesses().Length > 0;
+            bool started;
+            if (viaBnet) started = Profiles.LaunchViaBattleNet(s, 120);
+            else
+            {
+                Profiles.LaunchGame(s);
+                var sw = Stopwatch.StartNew();
+                while (!Profiles.GameRunning(s) && sw.Elapsed.TotalSeconds < 120) Thread.Sleep(500);
+                started = Profiles.GameRunning(s);
+            }
+
+            if (started) WaitForGameExit(s);
+            else MessageBox.Show("WoW Forever didn't start within 2 minutes." +
+                (viaBnet ? "\n\nCheck Battle.net: it may want an update, a login, or the WoW Forever version picked in its dropdown." : ""),
+                "ForeverPad");
+
+            if (viaBnet)
+            {
+                // Close the Battle.net we started so Steam sees the session end.
+                // If it was open before, reopen it outside Steam (via Explorer).
+                Profiles.CloseBattleNet();
+                if (bnetWasOpen)
+                {
+                    try { Process.Start("explorer.exe", "\"" + Settings.BattleNetExe() + "\""); } catch { }
+                }
+            }
 
             if (s.RestoreAfterPlay && before != profile)
             {
@@ -119,9 +141,9 @@ namespace ForeverPad
 
         static void WaitForGameExit(Settings s)
         {
-            // Require a few quiet seconds in a row so a self-restart doesn't count as quitting.
+            // Require 10 quiet seconds in a row so a self-restart doesn't count as quitting.
             int quiet = 0;
-            while (quiet < 3)
+            while (quiet < 10)
             {
                 Thread.Sleep(1000);
                 quiet = Profiles.GameRunning(s) ? 0 : quiet + 1;

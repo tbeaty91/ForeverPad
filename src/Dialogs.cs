@@ -78,8 +78,11 @@ namespace ForeverPad
                     if (f.ShowDialog(this) == DialogResult.OK) exe.Text = f.FileName;
             });
 
-            AddLabel("Extra launch arguments (usually blank)", 16, 130, 520, 20, false);
-            var args = AddBox(s.LaunchArgs, 16, 152, 430);
+            AddLabel("Battle.net launch code (blank = start the exe directly, which asks for a login)", 16, 130, 528, 20, false);
+            var code = AddBox(s.BnetCode, 16, 152, 120);
+            AddLabel(Settings.BattleNetExe() == null ? "Battle.net not found: the game exe will be started directly."
+                                                     : "WoWF = WoW Forever. Battle.net logs you in.",
+                146, 155, 400, 20, true);
 
             var restore = AddCheck("After a Steam controller session ends, switch back to Normal", s.RestoreAfterPlay, 16, 190, 528);
             var copy = AddCheck("New Controller profile copies Normal's Config.wtf (login, graphics, sound)", s.CopyConfigToController, 16, 216, 528);
@@ -97,7 +100,7 @@ namespace ForeverPad
                 }
                 s.WowDir = dir.Text.Trim();
                 s.GameExe = File.Exists(exe.Text) ? exe.Text.Trim() : (Settings.DetectGameExe(s.WowDir) ?? "");
-                s.LaunchArgs = args.Text.Trim();
+                s.BnetCode = code.Text.Trim();
                 s.RestoreAfterPlay = restore.Checked;
                 s.CopyConfigToController = copy.Checked;
                 s.Save();
@@ -124,9 +127,10 @@ namespace ForeverPad
             AddLabel("Adds a non-Steam game called \"" + Steam.ShortcutName + "\" to your Steam library. Launching it:",
                 16, 14, 568, 22, false);
             AddLabel("  1.  switches WoW Forever to the Controller profile (gamepad on)\n" +
-                     "  2.  starts WoW Forever under Steam, so Steam Input reads your controller\n" +
+                     "  2.  restarts Battle.net under Steam and has it launch WoW Forever (no login,\n" +
+                     "       and Steam Input still reads your controller)\n" +
                      "  3.  when you quit WoW, switches back to Normal (you can turn that off in Settings)",
-                16, 40, 568, 58, true);
+                16, 40, 568, 64, true);
 
             AddLabel(steam == null ? "Steam: not found. Install Steam and sign in first." : "Steam: " + steam,
                 16, 106, 568, 20, steam == null);
@@ -145,8 +149,8 @@ namespace ForeverPad
                 "     Start with the \"Gamepad\" layout and pick another one later if you want.\n" +
                 "•  The first time in game, look at Options ▸ Controls ▸ Gamepad to check it's on.\n" +
                 "     ConsolePort is a good first addon for the Controller profile.\n" +
-                "•  If WoW asks you to log in, that's because Battle.net isn't running. Start Battle.net\n" +
-                "     once and tick \"keep me logged in\", or log in with the controller's on-screen keyboard.",
+                "•  Battle.net must be signed in with \"keep me logged in\" ticked, and set to the WoW\n" +
+                "     Forever version. Any Battle.net window that's already open is closed and reopened.",
                 16, 246, 568, 170, true);
 
             AddButton("Close", 494, 426, 90, Theme.Panel, (o, e) => Close());

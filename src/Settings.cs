@@ -12,7 +12,8 @@ namespace ForeverPad
     {
         public string WowDir = "";          // the _forever_ folder
         public string GameExe = "";         // full path to the game exe (auto-detected)
-        public string LaunchArgs = "";      // extra args for the game exe
+        public string LaunchArgs = "";      // extra args for the game exe (direct launch only)
+        public string BnetCode = "WoWF";    // Battle.net launch code; blank = run the game exe directly
         public bool RestoreAfterPlay = true; // after a Steam session, switch back to Normal
         public bool CopyConfigToController = true; // seed controller Config.wtf from Normal
 
@@ -37,6 +38,7 @@ namespace ForeverPad
                         if (k == "WowDir") s.WowDir = v;
                         else if (k == "GameExe") s.GameExe = v;
                         else if (k == "LaunchArgs") s.LaunchArgs = v;
+                        else if (k == "BnetCode") s.BnetCode = v;
                         else if (k == "RestoreAfterPlay") s.RestoreAfterPlay = v == "1";
                         else if (k == "CopyConfigToController") s.CopyConfigToController = v == "1";
                     }
@@ -55,6 +57,7 @@ namespace ForeverPad
                 "WowDir=" + WowDir,
                 "GameExe=" + GameExe,
                 "LaunchArgs=" + LaunchArgs,
+                "BnetCode=" + BnetCode,
                 "RestoreAfterPlay=" + (RestoreAfterPlay ? "1" : "0"),
                 "CopyConfigToController=" + (CopyConfigToController ? "1" : "0"),
             });
@@ -130,6 +133,30 @@ namespace ForeverPad
                     .FirstOrDefault();
             }
             catch { return null; }
+        }
+
+        public bool UseBattleNet { get { return !string.IsNullOrEmpty(BnetCode) && BattleNetExe() != null; } }
+
+        public static string BattleNetExe()
+        {
+            var places = new List<string>();
+            foreach (var key in new[] {
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Battle.net",
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Battle.net" })
+            {
+                try
+                {
+                    using (var k = Registry.LocalMachine.OpenSubKey(key))
+                    {
+                        var p = k == null ? null : k.GetValue("InstallLocation") as string;
+                        if (!string.IsNullOrEmpty(p)) places.Add(Path.Combine(p, "Battle.net.exe"));
+                    }
+                }
+                catch { }
+            }
+            places.Add(@"C:\Program Files (x86)\Battle.net\Battle.net.exe");
+            places.Add(@"C:\Program Files\Battle.net\Battle.net.exe");
+            return places.FirstOrDefault(File.Exists);
         }
 
         // ---- Start with Windows (HKCU Run key) ----

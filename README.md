@@ -5,7 +5,7 @@ A Windows tray toggle that switches **WoW Forever** between two setups:
 - **Normal**: your usual `Interface` (addons), `WTF` (settings, keybinds, saved variables) and `Cache`.
 - **Controller**: starts out blank (no addons, no keybinds, gamepad on) and keeps whatever you add to it.
 
-It also adds a Steam shortcut, **WoW Forever (Controller)**. Launching that shortcut from Steam Link (for example on an Apple TV with a Bluetooth controller) switches WoW to Controller mode, runs the game under Steam Input, and switches back to Normal when you quit.
+It also adds a Steam shortcut, **WoW Forever (Controller)**. Launching that shortcut from Steam Link (for example on an Apple TV with a Bluetooth controller) switches WoW to Controller mode, then restarts Battle.net under Steam and launches WoW Forever through it (launch code `WoWF`). Battle.net logs you in, and because WoW is part of the Steam launch, Steam Input still reads your controller. When you quit, it closes that Battle.net, reopens it normally if it was open before, and switches back to Normal. Clear the launch code in Settings to start the game exe directly instead (that asks for a login).
 
 ## How switching works
 

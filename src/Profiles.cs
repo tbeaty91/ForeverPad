@@ -182,6 +182,63 @@ namespace ForeverPad
             File.WriteAllLines(path, lines);
         }
 
+        // ---- Battle.net launch (logs in for you) ----
+        // Steam Input and the overlay only attach to processes descended from
+        // the Steam launch. A Battle.net that's already running isn't one, so it
+        // is closed and started again from here; the game it launches is then
+        // part of the Steam process tree. Approach and the WoWF code are from
+        // github.com/rynmon/bnet-steam-launcher.
+        public static Process[] BattleNetProcesses()
+        {
+            try { return Process.GetProcessesByName("Battle.net"); } catch { return new Process[0]; }
+        }
+
+        public static void CloseBattleNet()
+        {
+            foreach (var p in BattleNetProcesses()) { try { p.Kill(); } catch { } }
+            var sw = Stopwatch.StartNew();
+            while (BattleNetProcesses().Length > 0 && sw.Elapsed.TotalSeconds < 15) Thread.Sleep(300);
+        }
+
+        static void SendBnet(string exe, string args)
+        {
+            var psi = new ProcessStartInfo(exe, args);
+            psi.WorkingDirectory = Path.GetDirectoryName(exe);
+            psi.UseShellExecute = false;
+            Process.Start(psi);
+        }
+
+        // Returns true once the game process is up.
+        public static bool LaunchViaBattleNet(Settings s, int startupWaitSec)
+        {
+            string bnet = Settings.BattleNetExe();
+            CloseBattleNet();
+            SendBnet(bnet, "");
+
+            // Wait for Battle.net to come up, then give it a moment to sign in.
+            var sw = Stopwatch.StartNew();
+            while (BattleNetProcesses().Length == 0 && sw.Elapsed.TotalSeconds < 20) Thread.Sleep(500);
+            Thread.Sleep(3000);
+
+            string launch = "--exec=\"launch " + s.BnetCode + "\"";
+            SendBnet(bnet, launch);
+            // Battle.net sometimes only SELECTS the game instead of starting it,
+            // or ignores a command sent while it's still loading: resend until it starts.
+            sw = Stopwatch.StartNew();
+            double lastSend = 0;
+            while (sw.Elapsed.TotalSeconds < startupWaitSec)
+            {
+                if (GameRunning(s)) return true;
+                if (sw.Elapsed.TotalSeconds - lastSend >= 10)
+                {
+                    lastSend = sw.Elapsed.TotalSeconds;
+                    try { SendBnet(bnet, launch); } catch { }
+                }
+                Thread.Sleep(500);
+            }
+            return GameRunning(s);
+        }
+
         // Start the game exe directly so it is a child of this process. Steam
         // hooks the process tree it launched, which is what lets Steam Input
         // drive the game from a streamed controller.

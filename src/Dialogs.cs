@@ -456,4 +456,26 @@ namespace ForeverPad
             renamedTo = null;
         }
     }
+
+    // Read-only text with a Copy button.
+    class DarkReport : DarkForm
+    {
+        readonly TextBox box;
+
+        public DarkReport(string title, string text) : base(title, 760, 520)
+        {
+            FormBorderStyle = FormBorderStyle.Sizable;
+            box = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false,
+                BackColor = Theme.Panel, ForeColor = Theme.Text, Font = new Font("Consolas", 9f), Text = text,
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
+            box.SetBounds(12, 12, 736, 452);
+            Controls.Add(box);
+            var copy = AddButton("Copy to clipboard", 12, 476, 160, Theme.NormalAccent, (o, e) => { try { Clipboard.SetText(box.Text); } catch { } });
+            copy.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            var close = AddButton("Close", 658, 476, 90, Theme.Panel, (o, e) => Close());
+            close.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+        }
+
+        public void SetText(string text) { box.Text = text; }
+    }
 }

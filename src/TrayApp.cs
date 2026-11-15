@@ -54,6 +54,7 @@ namespace ForeverPad
             menu.Items.Add("Settings…", null, (o, e) => ShowSettings());
             menu.Items.Add("Open folders", null, (o, e) => OpenFolders());
             menu.Items.Add(miBoot);
+            menu.Items.Add("CurseForge diagnostic…", null, (o, e) => ShowCurseForgeProbe());
             menu.Items.Add(new ToolStripSeparator());
             miUpdate = new ToolStripMenuItem("Check for updates", null, (o, e) =>
             {
@@ -254,6 +255,22 @@ namespace ForeverPad
             if (!s.IsReady) { ShowSettings(); return; }
             using (var f = new ManageProfilesForm(s)) f.ShowDialog();
             Sync(true);
+        }
+
+        void ShowCurseForgeProbe()
+        {
+            if (!s.IsReady) { ShowSettings(); return; }
+            var form = new DarkReport("CurseForge diagnostic", "Searching CurseForge's folders… (this can take a minute)");
+            var t = new System.Threading.Thread(() =>
+            {
+                string text;
+                try { text = CurseForgeProbe.Run(s); } catch (Exception ex) { text = "Probe failed: " + ex; }
+                try { form.BeginInvoke(new Action(() => form.SetText(text))); } catch { }
+            });
+            t.IsBackground = true;
+            t.Start();
+            form.ShowDialog();
+            form.Dispose();
         }
 
         public void ShowSettings()

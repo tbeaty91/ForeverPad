@@ -54,3 +54,112 @@ namespace ForeverPad
         }
     }
 }
+
+namespace ForeverPad
+{
+    // Finds where CurseForge keeps its record of installed WoW addons: any file
+    // in its data folders that mentions the _forever_ folder. Read-only.
+    static class CurseForgeProbe
+    {
+        public static string Run(Settings s)
+        {
+            var sb = new System.Text.StringBuilder();
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+            var roots = new System.Collections.Generic.List<string>();
+            foreach (var parent in new[] { appData, local, home, docs })
+            {
+                try
+                {
+                    foreach (var d in Directory.GetDirectories(parent))
+                    {
+                        var n = Path.GetFileName(d).ToLowerInvariant();
+                        if ((n.Contains("curse") || n.Contains("overwolf")) && !d.StartsWith(Path.Combine(local, "Programs"), StringComparison.OrdinalIgnoreCase))
+                            roots.Add(d);
+                    }
+                }
+                catch { }
+            }
+
+            sb.AppendLine("ForeverPad v" + Program.Version + " CurseForge probe");
+            sb.AppendLine("WoW folder: " + s.WowDir);
+            sb.AppendLine("Active profile: " + (s.IsReady ? Profiles.Active(s.WowDir) : "?"));
+            sb.AppendLine("CurseForge running: " + CurseForgeApp.IsRunning);
+            foreach (var p in Process.GetProcessesByName("CurseForge").Take(1))
+            {
+                try { sb.AppendLine("CurseForge exe: " + p.MainModule.FileName); } catch { }
+            }
+            sb.AppendLine();
+            sb.AppendLine("Searched folders:");
+            foreach (var r in roots) sb.AppendLine("  " + r);
+            if (roots.Count == 0) sb.AppendLine("  (none found named *curse* or *overwolf*)");
+            sb.AppendLine();
+
+            string needle = Path.GetFileName(s.WowDir.TrimEnd('\\', '/')); // "_forever_"
+            var ascii = System.Text.Encoding.ASCII.GetBytes(needle);
+            var wide = System.Text.Encoding.Unicode.GetBytes(needle);
+            int scanned = 0, hits = 0;
+            sb.AppendLine("Files mentioning \"" + needle + "\" (size, last changed, path):");
+            foreach (var r in roots)
+            {
+                foreach (var f in Walk(r, 0))
+                {
+                    try
+                    {
+                        var fi = new FileInfo(f);
+                        if (fi.Length == 0 || fi.Length > 300L * 1024 * 1024) continue;
+                        scanned++;
+                        var bytes = File.ReadAllBytes(f);
+                        if (IndexOf(bytes, ascii) >= 0 || IndexOf(bytes, wide) >= 0)
+                        {
+                            hits++;
+                            sb.AppendLine("  " + (fi.Length / 1024) + " KB  " + fi.LastWriteTime.ToString("yyyy-MM-dd HH:mm") + "  " + f);
+                        }
+                    }
+                    catch { } // locked or unreadable: skip
+                }
+            }
+            if (hits == 0) sb.AppendLine("  (none)");
+            sb.AppendLine();
+            sb.AppendLine(scanned + " files checked.");
+
+            // Also: anything CurseForge may have left inside the WoW folder itself.
+            sb.AppendLine();
+            sb.AppendLine("Non-addon files directly in _forever_\\Interface and Interface\\AddOns:");
+            foreach (var d in new[] { Path.Combine(s.WowDir, "Interface"), Path.Combine(s.WowDir, "Interface", "AddOns") })
+            {
+                try { foreach (var f in Directory.GetFiles(d)) sb.AppendLine("  " + f); } catch { }
+            }
+            return sb.ToString();
+        }
+
+        static System.Collections.Generic.IEnumerable<string> Walk(string dir, int depth)
+        {
+            string[] files = new string[0], dirs = new string[0];
+            try { files = Directory.GetFiles(dir); } catch { }
+            foreach (var f in files) yield return f;
+            if (depth >= 8) yield break;
+            try { dirs = Directory.GetDirectories(dir); } catch { }
+            foreach (var d in dirs)
+            {
+                var n = Path.GetFileName(d).ToLowerInvariant();
+                if (n == "cache" || n == "code cache" || n == "gpucache" || n == "logs" || n == "crashpad") continue;
+                foreach (var f in Walk(d, depth + 1)) yield return f;
+            }
+        }
+
+        static int IndexOf(byte[] hay, byte[] needle)
+        {
+            for (int i = 0; i <= hay.Length - needle.Length; i++)
+            {
+                int j = 0;
+                while (j < needle.Length && (hay[i + j] | 0x20) == (needle[j] | 0x20)) j++;
+                if (j == needle.Length) return i;
+            }
+            return -1;
+        }
+    }
+}

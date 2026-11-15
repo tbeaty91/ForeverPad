@@ -269,8 +269,17 @@ namespace ForeverPad
             try { got = SwitchLock.WaitOne(10000); }
             catch (AbandonedMutexException) { got = true; }
             if (!got) throw new InvalidOperationException("Another switch is in progress.");
-            try { SwitchLocked(s, target); }
-            finally { SwitchLock.ReleaseMutex(); }
+            string curseForge = null;
+            try
+            {
+                if (s.RestartCurseForge && Active(s.WowDir) != target) curseForge = CurseForgeApp.Close();
+                SwitchLocked(s, target);
+            }
+            finally
+            {
+                SwitchLock.ReleaseMutex();
+                CurseForgeApp.Reopen(curseForge); // reopen even if the switch failed
+            }
         }
 
         static void SwitchLocked(Settings s, string target)

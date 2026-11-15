@@ -16,6 +16,7 @@ namespace ForeverPad
         public string BnetCode = "WoWF";    // Battle.net launch code; blank = run the game exe directly
         public bool RestoreAfterPlay = true; // after a Steam session, switch back to Normal
         public bool CopyConfigToController = true; // seed controller Config.wtf from Normal
+        public bool RestartCurseForge = true;      // close CurseForge before a switch, reopen after
 
         public static string Dir
         {
@@ -41,6 +42,7 @@ namespace ForeverPad
                         else if (k == "BnetCode") s.BnetCode = v;
                         else if (k == "RestoreAfterPlay") s.RestoreAfterPlay = v == "1";
                         else if (k == "CopyConfigToController") s.CopyConfigToController = v == "1";
+                        else if (k == "RestartCurseForge") s.RestartCurseForge = v == "1";
                     }
                 }
             }
@@ -60,6 +62,7 @@ namespace ForeverPad
                 "BnetCode=" + BnetCode,
                 "RestoreAfterPlay=" + (RestoreAfterPlay ? "1" : "0"),
                 "CopyConfigToController=" + (CopyConfigToController ? "1" : "0"),
+                "RestartCurseForge=" + (RestartCurseForge ? "1" : "0"),
             });
         }
 

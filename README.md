@@ -11,6 +11,10 @@ It also adds a Steam shortcut, **WoW Forever (Controller)**. Launching that shor
 
 Normal and Controller are always there. **+ New profile…** in the tray popup makes more. A new profile can start **blank** or as a **copy** of any profile's addons, keybinds and settings. Use a copy to try new addons, because the original is only read and never changes. Each profile has its own colour in the tray and can turn gamepad mode on or off. **Manage…** switches, duplicates, renames, deletes (to the Recycle Bin) and sets gamepad mode. Normal and Controller can't be renamed or deleted. `--play "<profile>"` and `--switch <profile>` take any profile name.
 
+## CurseForge
+
+CurseForge works out your installed addons by scanning `Interface\AddOns` when it starts. If it's open during a switch, ForeverPad closes it first and reopens it afterwards, so it rescans and shows the new profile's addons. You can turn this off in Settings. Each profile's addons are managed separately: updating in CurseForge only changes the active profile.
+
 ## How switching works
 
 The live `_forever_` folder always holds the active profile's real folders. The inactive profile is parked in `World of Warcraft\_forever__profiles\<Name>\`. A switch renames those folders on the same drive, so it's instant and nothing gets deleted. If any rename fails, the ones already done are undone. You can't switch while the game is running.

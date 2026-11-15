@@ -243,9 +243,9 @@ namespace ForeverPad
         {
             if (!s.IsReady) { ShowSettings(); return; }
             using (var f = new NewProfileForm(s, copyFrom))
-                if (f.ShowDialog() == DialogResult.OK && f.Created != null)
-                    tray.ShowBalloonTip(2500, "WoW Forever", "Created " + f.Created +
-                        (Profiles.Active(s.WowDir) == f.Created ? " and switched to it." : "."), ToolTipIcon.None);
+                if (f.ShowDialog() == DialogResult.OK && f.CreatedName != null)
+                    tray.ShowBalloonTip(2500, "WoW Forever", "Created " + f.CreatedName +
+                        (Profiles.Active(s.WowDir) == f.CreatedName ? " and switched to it." : "."), ToolTipIcon.None);
             Sync(true);
         }
 

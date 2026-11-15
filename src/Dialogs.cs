@@ -239,7 +239,7 @@ namespace ForeverPad
 
     class NewProfileForm : DarkForm
     {
-        public string Created;
+        public string CreatedName;
 
         public NewProfileForm(Settings s, string copyFrom) : base("New WoW Forever profile", 460, 300)
         {
@@ -293,7 +293,7 @@ namespace ForeverPad
                         UseWaitCursor = false;
                         create.Enabled = true;
                         if (fail != null) { status.ForeColor = Theme.Warn; status.Text = fail; return; }
-                        Created = n;
+                        CreatedName = n;
                         DialogResult = DialogResult.OK;
                         Close();
                     }));
@@ -385,7 +385,7 @@ namespace ForeverPad
         void NewFrom(string src)
         {
             using (var f = new NewProfileForm(s, src))
-                if (f.ShowDialog(this) == DialogResult.OK) { Changed = true; Reload(f.Created); }
+                if (f.ShowDialog(this) == DialogResult.OK) { Changed = true; Reload(f.CreatedName); }
         }
 
         void Do(Action a)

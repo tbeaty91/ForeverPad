@@ -18,6 +18,21 @@ namespace ForeverPad
 
         public TrayApp()
         {
+            // Boot with the PC by default: on first run, turn it on. On later runs,
+            // re-point the Run entry at this exe in case it was moved.
+            try
+            {
+                string seen = Path.Combine(Settings.Dir, "boot-default-applied");
+                if (!File.Exists(seen))
+                {
+                    Settings.StartWithWindows = true;
+                    Directory.CreateDirectory(Settings.Dir);
+                    File.WriteAllText(seen, "1");
+                }
+                else if (Settings.StartWithWindows) Settings.StartWithWindows = true;
+            }
+            catch { }
+
             popup = new Popup(this);
             var popupHandle = popup.Handle; // create the window now so BeginInvoke works
 

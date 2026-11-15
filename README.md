@@ -15,7 +15,7 @@ The first switch to Controller creates the blank slate. By default it copies Nor
 
 ## Use
 
-1. Run `ForeverPad.exe`. It finds `World of Warcraft\_forever_` on its own. If it can't, it opens Settings so you can pick the folder.
+1. Run `ForeverPad.exe`. It starts with Windows from then on (you can turn that off in the menu or Settings). It finds `World of Warcraft\_forever_` on its own. If it can't, it opens Settings so you can pick the folder.
 2. Left-click the tray icon to open the toggle. Right-click it for the menu.
 3. Open **Steam setup… → Add to Steam**. ForeverPad closes Steam if needed, then writes the shortcut and keeps a `shortcuts.vdf.foreverpad-backup`.
 

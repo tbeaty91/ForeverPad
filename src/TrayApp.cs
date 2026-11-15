@@ -242,7 +242,7 @@ namespace ForeverPad
         public void ShowNewProfile(string copyFrom)
         {
             if (!s.IsReady) { ShowSettings(); return; }
-            using (var f = new NewProfileForm(s, copyFrom))
+            using (var f = new NewProfileForm(s, copyFrom, null))
                 if (f.ShowDialog() == DialogResult.OK && f.CreatedName != null)
                     tray.ShowBalloonTip(2500, "WoW Forever", "Created " + f.CreatedName +
                         (Profiles.Active(s.WowDir) == f.CreatedName ? " and switched to it." : "."), ToolTipIcon.None);

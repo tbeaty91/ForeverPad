@@ -17,6 +17,7 @@ namespace ForeverPad
         public bool RestoreAfterPlay = true; // after a Steam session, switch back to Normal
         public bool CopyConfigToController = true; // seed controller Config.wtf from Normal
         public bool RestartCurseForge = true;      // close CurseForge before a switch, reopen after
+        public int NewProfileParts = 1 | 4;         // remembered New-profile ticks: keybinds + game settings
 
         public static string Dir
         {
@@ -43,6 +44,7 @@ namespace ForeverPad
                         else if (k == "RestoreAfterPlay") s.RestoreAfterPlay = v == "1";
                         else if (k == "CopyConfigToController") s.CopyConfigToController = v == "1";
                         else if (k == "RestartCurseForge") s.RestartCurseForge = v == "1";
+                        else if (k == "NewProfileParts") { int n; if (int.TryParse(v, out n)) s.NewProfileParts = n; }
                     }
                 }
             }
@@ -63,6 +65,7 @@ namespace ForeverPad
                 "RestoreAfterPlay=" + (RestoreAfterPlay ? "1" : "0"),
                 "CopyConfigToController=" + (CopyConfigToController ? "1" : "0"),
                 "RestartCurseForge=" + (RestartCurseForge ? "1" : "0"),
+                "NewProfileParts=" + NewProfileParts,
             });
         }
 

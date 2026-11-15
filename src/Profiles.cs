@@ -16,6 +16,21 @@ using System.Threading;
 
 namespace ForeverPad
 {
+    // The pieces of a profile that can be copied into a new one.
+    [Flags]
+    enum Part
+    {
+        None = 0,
+        Keybinds = 1,       // bindings-cache.wtf (account + every character)
+        Macros = 2,         // macros-cache.txt
+        GameSettings = 4,   // WTF\Config.wtf: graphics, sound, login
+        UiOptions = 8,      // config-cache.wtf, layout-local.txt: interface options, window layout
+        Chat = 16,          // chat-cache.txt: chat windows and tabs
+        AddonSettings = 32, // SavedVariables folders + AddOns.txt (which addons are switched on)
+        Addons = 64,        // the Interface folder: the addons themselves
+        All = 127,
+    }
+
     static class Profiles
     {
         public const string Normal = "Normal";
@@ -171,7 +186,7 @@ namespace ForeverPad
 
         // New profile: blank (no addons, keybinds or cache) or a copy of another
         // profile's Interface + WTF. The source is only read, never moved.
-        public static void Create(Settings s, string name, string copyFrom, bool gamepad, Action<string> progress)
+        public static void Create(Settings s, string name, string copyFrom, Part parts, bool gamepad, Action<string> progress)
         {
             name = name.Trim();
             var err = NameError(name);
@@ -185,16 +200,22 @@ namespace ForeverPad
             try
             {
                 Directory.CreateDirectory(dir);
-                if (copyFrom == null) SeedBlank(s, dir);
+                if (copyFrom == null || parts == Part.None) SeedBlank(s, dir);
                 else
                 {
-                    foreach (var sub in new[] { "Interface", "WTF" })
+                    string srcWtf = FolderOf(s.WowDir, copyFrom, "WTF");
+                    string srcUi = FolderOf(s.WowDir, copyFrom, "Interface");
+                    if ((parts & Part.Addons) != 0 && Directory.Exists(srcUi))
                     {
-                        string src = FolderOf(s.WowDir, copyFrom, sub);
-                        if (!Directory.Exists(src)) continue;
-                        if (progress != null) progress("Copying " + copyFrom + "'s " + sub + "…");
-                        CopyTree(src, Path.Combine(dir, sub));
+                        if (progress != null) progress("Copying " + copyFrom + "'s addons…");
+                        CopyTree(srcUi, Path.Combine(dir, "Interface"));
                     }
+                    else Directory.CreateDirectory(Path.Combine(dir, "Interface", "AddOns"));
+
+                    if (progress != null) progress("Copying " + copyFrom + "'s settings…");
+                    if (!Directory.Exists(srcWtf)) Directory.CreateDirectory(Path.Combine(dir, "WTF"));
+                    else if (parts == Part.All) CopyTree(srcWtf, Path.Combine(dir, "WTF")); // exact copy, every file
+                    else CopyParts(srcWtf, srcWtf, Path.Combine(dir, "WTF"), parts);
                 }
                 SetGamepad(s.WowDir, name, gamepad);
             }
@@ -203,6 +224,38 @@ namespace ForeverPad
                 try { Directory.Delete(dir, true); } catch { }
                 throw;
             }
+        }
+
+        // Which part a file inside WTF belongs to. Files that fit none of them
+        // (unknown or rare ones) only travel with a full copy.
+        static Part PartOf(string wtfRoot, string file)
+        {
+            string name = Path.GetFileName(file).ToLowerInvariant();
+            string rel = file.Substring(wtfRoot.Length).TrimStart('\\').ToLowerInvariant();
+            if (rel.Split('\\').Contains("savedvariables")) return Part.AddonSettings;
+            if (rel == "config.wtf") return Part.GameSettings;
+            switch (name)
+            {
+                case "bindings-cache.wtf": return Part.Keybinds;
+                case "macros-cache.txt": return Part.Macros;
+                case "config-cache.wtf":
+                case "layout-local.txt": return Part.UiOptions;
+                case "chat-cache.txt": return Part.Chat;
+                case "addons.txt": return Part.AddonSettings;
+            }
+            return Part.None;
+        }
+
+        // Copy only the chosen parts, keeping the Account\<name>\<realm>\<character> layout.
+        static void CopyParts(string wtfRoot, string src, string dst, Part parts)
+        {
+            Directory.CreateDirectory(dst);
+            foreach (var f in Directory.GetFiles(src))
+            {
+                var p = PartOf(wtfRoot, f);
+                if (p != Part.None && (parts & p) != 0) File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), false);
+            }
+            foreach (var d in Directory.GetDirectories(src)) CopyParts(wtfRoot, d, Path.Combine(dst, Path.GetFileName(d)), parts);
         }
 
         static void CopyTree(string src, string dst)

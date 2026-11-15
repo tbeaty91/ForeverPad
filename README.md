@@ -9,7 +9,7 @@ It also adds a Steam shortcut, **WoW Forever (Controller)**. Launching that shor
 
 ## More profiles
 
-Normal and Controller are always there. **+ New profile…** in the tray popup makes more. A new profile can start **blank** or as a **copy** of any profile's addons, keybinds and settings. Use a copy to try new addons, because the original is only read and never changes. Each profile has its own colour in the tray and can turn gamepad mode on or off. **Manage…** switches, duplicates, renames, deletes (to the Recycle Bin) and sets gamepad mode. Normal and Controller can't be renamed or deleted. `--play "<profile>"` and `--switch <profile>` take any profile name.
+Normal and Controller are always there. **+ New profile…** in the tray popup makes more. A new profile can start **blank**, or copy chosen parts of another profile: keybindings, macros, game settings (graphics and sound), interface options and layout, chat windows, addon settings, or the addons themselves. **Just keybindings** and **Everything** set the ticks in one click, and your last choice is remembered. Use a copy to try new addons, because the original is only read and never changes. Each profile has its own colour in the tray and can turn gamepad mode on or off. **Manage…** switches, duplicates, renames, deletes (to the Recycle Bin) and sets gamepad mode. Normal and Controller can't be renamed or deleted. `--play "<profile>"` and `--switch <profile>` take any profile name.
 
 ## CurseForge
 

@@ -243,40 +243,74 @@ namespace ForeverPad
     {
         public string CreatedName;
 
-        public NewProfileForm(Settings s, string copyFrom) : base("New WoW Forever profile", 460, 300)
+        static readonly Part[] PartOrder = { Part.Keybinds, Part.Macros, Part.GameSettings, Part.UiOptions, Part.Chat, Part.AddonSettings, Part.Addons };
+        static readonly string[] PartText = {
+            "Keybindings", "Macros", "Game settings (graphics, sound)", "Interface options + layout",
+            "Chat windows", "Addon settings", "Addons themselves" };
+
+        // copyFrom null = the active profile; parts null = the ticks used last time.
+        public NewProfileForm(Settings s, string copyFrom, Part? parts) : base("New WoW Forever profile", 460, 470)
         {
             var list = Profiles.List(s.WowDir);
-            AddLabel("Name", 16, 14, 420, 20, false);
-            var name = AddBox(copyFrom == null ? "" : copyFrom + " test", 16, 36, 428);
+            string src0 = copyFrom ?? Profiles.Active(s.WowDir);
+            Part ticks0 = parts ?? (Part)s.NewProfileParts;
 
-            AddLabel("Start from", 16, 72, 420, 20, false);
+            AddLabel("Name", 16, 14, 420, 20, false);
+            var name = AddBox(parts == Part.All ? src0 + " copy" : "", 16, 36, 428);
+
+            AddLabel("Copy from", 16, 72, 420, 20, false);
             var from = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Theme.Panel, ForeColor = Theme.Text, FlatStyle = FlatStyle.Flat };
             from.SetBounds(16, 94, 428, 26);
-            from.Items.Add("Blank: no addons, no keybinds, no saved settings");
-            foreach (var p in list) from.Items.Add("Copy of " + p + ": its addons, keybinds and settings");
-            from.SelectedIndex = copyFrom == null ? 0 : Math.Max(0, list.IndexOf(copyFrom) + 1);
+            from.Items.Add("Nothing: start completely blank");
+            foreach (var p in list) from.Items.Add(p);
+            from.SelectedIndex = Math.Max(0, list.IndexOf(src0) + 1);
             Controls.Add(from);
 
-            var pad = AddCheck("Gamepad mode on when this profile is active", copyFrom != null && Profiles.IsPad(s.WowDir, copyFrom), 16, 132, 428);
+            var partsLabel = AddLabel("What to bring over:", 16, 130, 420, 20, false);
+            var boxes = new List<CheckBox>();
+            for (int i = 0; i < PartOrder.Length; i++)
+            {
+                int col = i % 2, row = i / 2;
+                boxes.Add(AddCheck(PartText[i], (ticks0 & PartOrder[i]) != 0, 16 + col * 216, 152 + row * 26, 212));
+            }
+            int yq = 152 + ((PartOrder.Length + 1) / 2) * 26 + 4;
+            Action<Part> setTicks = want => { for (int i = 0; i < boxes.Count; i++) boxes[i].Checked = (want & PartOrder[i]) != 0; };
+            var bKeys = AddButton("Just keybindings", 16, yq, 140, Theme.Panel, (o, e) => setTicks(Part.Keybinds));
+            var bAll = AddButton("Everything", 162, yq, 100, Theme.Panel, (o, e) => setTicks(Part.All));
+            var bNone = AddButton("None", 268, yq, 70, Theme.Panel, (o, e) => setTicks(Part.None));
+
+            int y = yq + 44;
+            var pad = AddCheck("Gamepad mode on when this profile is active", Profiles.IsPad(s.WowDir, src0), 16, y, 428);
+            var go = AddCheck("Switch to it now", true, 16, y + 26, 428);
+            AddLabel("Copying only reads the original, so it stays exactly as it was. " +
+                     "Unticked parts start fresh. The cache is never copied; WoW rebuilds it.", 16, y + 58, 428, 40, true);
+            var status = AddLabel("", 16, y + 102, 236, 40, false);
+
+            Action sync = () =>
+            {
+                bool any = from.SelectedIndex > 0;
+                partsLabel.Enabled = bKeys.Enabled = bAll.Enabled = bNone.Enabled = any;
+                foreach (var c in boxes) c.Enabled = any;
+            };
             from.SelectedIndexChanged += (o, e) =>
             {
-                if (from.SelectedIndex > 0) pad.Checked = Profiles.IsPad(s.WowDir, list[from.SelectedIndex - 1]);
+                sync();
+                pad.Checked = from.SelectedIndex > 0 && Profiles.IsPad(s.WowDir, list[from.SelectedIndex - 1]);
             };
-            var go = AddCheck("Switch to it now", true, 16, 158, 428);
-
-            AddLabel("Copies don't touch the original: try new addons in the copy and your main setup stays exactly as it was. " +
-                     "The cache isn't copied; WoW rebuilds it.", 16, 190, 428, 50, true);
-            var status = AddLabel("", 16, 244, 240, 40, false);
+            sync();
 
             Button create = null;
-            create = AddButton("Create", 258, 256, 90, Theme.NormalAccent, (o, e) =>
+            create = AddButton("Create", 258, y + 110, 90, Theme.NormalAccent, (o, e) =>
             {
                 string n = name.Text.Trim();
                 string src = from.SelectedIndex > 0 ? list[from.SelectedIndex - 1] : null;
+                Part chosen = Part.None;
+                for (int i = 0; i < boxes.Count; i++) if (boxes[i].Checked) chosen |= PartOrder[i];
                 bool padOn = pad.Checked, switchNow = go.Checked;
                 var err = Profiles.NameError(n);
                 if (err != null) { status.ForeColor = Theme.Warn; status.Text = err; return; }
 
+                if (src != null && parts == null) { s.NewProfileParts = (int)chosen; try { s.Save(); } catch { } }
                 create.Enabled = false;
                 UseWaitCursor = true;
                 status.ForeColor = Theme.Dim;
@@ -286,7 +320,7 @@ namespace ForeverPad
                     string fail = null;
                     try
                     {
-                        Profiles.Create(s, n, src, padOn, msg => BeginInvoke(new Action(() => status.Text = msg)));
+                        Profiles.Create(s, n, src, chosen, padOn, msg => BeginInvoke(new Action(() => status.Text = msg)));
                         if (switchNow && !Profiles.GameRunning(s)) Profiles.Switch(s, n);
                     }
                     catch (Exception ex) { fail = ex.Message; }
@@ -303,8 +337,9 @@ namespace ForeverPad
                 t.IsBackground = true;
                 t.Start();
             });
-            AddButton("Cancel", 354, 256, 90, Theme.Panel, (o, e) => Close());
+            AddButton("Cancel", 354, y + 110, 90, Theme.Panel, (o, e) => Close());
             AcceptButton = create;
+            ClientSize = new Size(460, y + 154);
         }
     }
 
@@ -330,8 +365,8 @@ namespace ForeverPad
             Controls.Add(box);
 
             bSwitch = AddButton("Switch to it", 282, 16, 222, Theme.NormalAccent, (o, e) => Do(() => Profiles.Switch(s, Sel)));
-            AddButton("New…", 282, 54, 108, Theme.Panel, (o, e) => NewFrom(null));
-            bDup = AddButton("Duplicate…", 396, 54, 108, Theme.Panel, (o, e) => NewFrom(Sel));
+            AddButton("New…", 282, 54, 108, Theme.Panel, (o, e) => NewFrom(null, null));
+            bDup = AddButton("Duplicate…", 396, 54, 108, Theme.Panel, (o, e) => NewFrom(Sel, Part.All));
             bRename = AddButton("Rename…", 282, 92, 108, Theme.Panel, (o, e) =>
             {
                 using (var f = new AskText("Rename profile", "New name for " + Sel, Sel))
@@ -404,9 +439,9 @@ namespace ForeverPad
             }
         }
 
-        void NewFrom(string src)
+        void NewFrom(string src, Part? parts)
         {
-            using (var f = new NewProfileForm(s, src))
+            using (var f = new NewProfileForm(s, src, parts))
                 if (f.ShowDialog(this) == DialogResult.OK) { Changed = true; Reload(f.CreatedName); }
         }
 

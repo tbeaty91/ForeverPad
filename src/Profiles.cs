@@ -322,7 +322,7 @@ namespace ForeverPad
             try { got = SwitchLock.WaitOne(10000); }
             catch (AbandonedMutexException) { got = true; }
             if (!got) throw new InvalidOperationException("Another switch is in progress.");
-            string curseForge = null;
+            string[] curseForge = null;
             try
             {
                 if (s.RestartCurseForge && Active(s.WowDir) != target) curseForge = CurseForgeApp.Close();
@@ -395,9 +395,11 @@ namespace ForeverPad
                     {
                         try { Directory.Move(done[i][1], done[i][0]); } catch { }
                     }
+                    string cf = CurseForgeApp.RunningNames();
                     throw new InvalidOperationException(
                         "Switch failed and was undone: " + ex.Message +
-                        "\n\nIf a folder is in use (Explorer window, CurseForge, an editor), close it and retry.", ex);
+                        (cf != "" ? "\n\nStill running: " + cf + ". Close it from the tray (or Task Manager) and retry." : "") +
+                        "\n\nIf a folder is open in an Explorer window or an editor, close that too and retry.", ex);
                 }
             }
 
@@ -417,9 +419,17 @@ namespace ForeverPad
         static readonly string[] SyncCvars = {
             "synchronizeSettings", "synchronizeConfig", "synchronizeBindings", "synchronizeMacros", "synchronizeChatFrames" };
 
+        // A folder can stay "in use" for a few seconds after the app holding it
+        // closes (or while antivirus scans it), so retry before giving up.
         static void Move(string from, string to, List<string[]> done)
         {
-            Directory.Move(from, to);
+            for (int attempt = 0; ; attempt++)
+            {
+                try { Directory.Move(from, to); break; }
+                catch (IOException) { if (attempt >= 20) throw; }
+                catch (UnauthorizedAccessException) { if (attempt >= 20) throw; }
+                Thread.Sleep(500);
+            }
             done.Add(new[] { from, to });
         }
 

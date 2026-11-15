@@ -15,42 +15,68 @@ namespace ForeverPad
 {
     static class CurseForgeApp
     {
+        // Every CurseForge process: the app (several Electron processes named
+        // "CurseForge") and its background agent, which watches the addon
+        // folders and keeps them in use even after the window is gone.
         static Process[] Procs()
         {
-            try { return Process.GetProcessesByName("CurseForge"); } catch { return new Process[0]; }
+            try
+            {
+                return Process.GetProcesses()
+                    .Where(p => { try { return p.ProcessName.IndexOf("curseforge", StringComparison.OrdinalIgnoreCase) >= 0; } catch { return false; } })
+                    .ToArray();
+            }
+            catch { return new Process[0]; }
         }
 
         public static bool IsRunning { get { return Procs().Length > 0; } }
 
-        // Closes CurseForge if it's open. Returns its exe path, to reopen it with, or null.
-        public static string Close()
+        public static string RunningNames()
+        {
+            return string.Join(", ", Procs().Select(p => { try { return p.ProcessName; } catch { return "?"; } }).Distinct().ToArray());
+        }
+
+        // Closes every CurseForge process and waits until they've all exited.
+        // Returns what to start again afterwards ("" if nothing was running).
+        public static string[] Close()
         {
             var ps = Procs();
-            if (ps.Length == 0) return null;
-            string exe = null;
+            if (ps.Length == 0) return new string[0];
+
+            var exes = new System.Collections.Generic.List<string>();
             foreach (var p in ps)
             {
-                try { if (exe == null) exe = p.MainModule.FileName; } catch { }
+                try { var f = p.MainModule.FileName; if (!exes.Contains(f, StringComparer.OrdinalIgnoreCase)) exes.Add(f); } catch { }
             }
+            // If the app itself was open, reopening it brings its agent back too.
+            // If only the agent was running, bring back just the agent.
+            var app = exes.FirstOrDefault(f => Path.GetFileName(f).Equals("CurseForge.exe", StringComparison.OrdinalIgnoreCase));
+            var reopen = app != null ? new[] { app } : exes.ToArray();
 
-            // Ask nicely first (it's an Electron app: one window, several helper processes).
+            // Ask nicely first, then end whatever is left (closing the window may only hide it to the tray).
             foreach (var p in ps) { try { p.CloseMainWindow(); } catch { } }
             var sw = Stopwatch.StartNew();
             while (IsRunning && sw.Elapsed.TotalSeconds < 5) Thread.Sleep(250);
-            // Closing the window may only hide it to the tray: end it for real.
-            foreach (var p in Procs()) { try { p.Kill(); } catch { } }
-            sw.Restart();
-            while (IsRunning && sw.Elapsed.TotalSeconds < 10) Thread.Sleep(250);
-            Thread.Sleep(500);
-            return exe;
+            for (int round = 0; round < 3 && IsRunning; round++)
+            {
+                foreach (var p in Procs()) { try { p.Kill(); } catch { } }
+                sw.Restart();
+                while (IsRunning && sw.Elapsed.TotalSeconds < 5) Thread.Sleep(250);
+            }
+            Thread.Sleep(1500); // let Windows release the folder handles
+            return reopen;
         }
 
-        // Start it again as an ordinary app (through Explorer, so it isn't a
-        // child of ForeverPad or of a Steam session).
-        public static void Reopen(string exe)
+        // Start them again as ordinary apps (through Explorer, so they aren't
+        // children of ForeverPad or of a Steam session).
+        public static void Reopen(string[] exes)
         {
-            if (string.IsNullOrEmpty(exe) || !File.Exists(exe)) return;
-            try { Process.Start("explorer.exe", "\"" + exe + "\""); } catch { }
+            if (exes == null) return;
+            foreach (var exe in exes)
+            {
+                if (string.IsNullOrEmpty(exe) || !File.Exists(exe)) continue;
+                try { Process.Start("explorer.exe", "\"" + exe + "\""); } catch { }
+            }
         }
     }
 }

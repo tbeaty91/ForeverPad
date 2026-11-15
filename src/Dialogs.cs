@@ -190,4 +190,28 @@ namespace ForeverPad
             t.Start();
         }
     }
+
+    // Shown at Windows start-up: two big buttons, current choice preselected.
+    class BootAsk : DarkForm
+    {
+        public string Choice; // null = keep current
+
+        public BootAsk(string current) : base("WoW Forever", 420, 196)
+        {
+            TopMost = true;
+            AddLabel("Which WoW Forever setup for this session?", 20, 16, 380, 22, false);
+            AddLabel("Now: " + Profiles.Describe(current), 20, 40, 380, 36, true);
+
+            var n = AddButton("Normal", 20, 86, 182, current == Profiles.Normal ? Theme.NormalAccent : Theme.Panel,
+                (o, e) => { Choice = Profiles.Normal; Close(); });
+            var c = AddButton("Controller", 218, 86, 182, current == Profiles.Controller ? Theme.PadAccent : Theme.Panel,
+                (o, e) => { Choice = Profiles.Controller; Close(); });
+            n.Height = c.Height = 44;
+            n.Font = c.Font = new Font("Segoe UI Semibold", 11f);
+            AcceptButton = current == Profiles.Controller ? c : n;
+
+            AddLabel("You can change it any time from the tray icon. Steam launches switch on their own.",
+                20, 144, 380, 36, true);
+        }
+    }
 }

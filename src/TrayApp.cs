@@ -16,7 +16,7 @@ namespace ForeverPad
         string shownActive;
         bool shownRunning;
 
-        public TrayApp()
+        public TrayApp(bool boot)
         {
             // Boot with the PC by default: on first run, turn it on. On later runs,
             // re-point the Run entry at this exe in case it was moved.
@@ -71,7 +71,8 @@ namespace ForeverPad
             Sync(true);
             tray.Visible = true;
 
-            if (!s.IsReady)
+            if (boot && s.IsReady) AskAtBoot();
+            else if (!s.IsReady)
             {
                 tray.ShowBalloonTip(4000, "ForeverPad", "Couldn't find WoW Forever. Pick its folder in Settings.", ToolTipIcon.Info);
                 ShowSettings();
@@ -116,6 +117,19 @@ namespace ForeverPad
                 MessageBox.Show(ex.Message, "ForeverPad", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             Sync(true);
+        }
+
+        // Started with Windows: ask which setup to use for this session.
+        void AskAtBoot()
+        {
+            if (Profiles.GameRunning(s)) return;
+            string pick;
+            using (var f = new BootAsk(Profiles.Active(s.WowDir)))
+            {
+                f.ShowDialog();
+                pick = f.Choice;
+            }
+            if (pick != null && pick != Profiles.Active(s.WowDir)) SwitchTo(pick);
         }
 
         public void ShowSettings()

@@ -1,6 +1,7 @@
 // ForeverPad — tray toggle between a Normal and a Controller WoW Forever setup.
 //
 //   ForeverPad.exe                     tray icon (one instance)
+//   ForeverPad.exe --boot              same, started with Windows: asks which setup to use
 //   ForeverPad.exe --play controller   what the Steam shortcut runs: switch, launch,
 //                                      wait for the game to close, switch back
 //   ForeverPad.exe --switch normal|controller
@@ -44,7 +45,7 @@ namespace ForeverPad
                     MessageBox.Show("ForeverPad is already running. Its icon is in the taskbar tray (check the ^ overflow).", "ForeverPad");
                     return 0;
                 }
-                Application.Run(new TrayApp());
+                Application.Run(new TrayApp(mode == "--boot"));
                 GC.KeepAlive(m);
             }
             return 0;

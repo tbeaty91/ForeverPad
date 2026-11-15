@@ -145,7 +145,7 @@ namespace ForeverPad
             {
                 using (var k = Registry.CurrentUser.CreateSubKey(RunKey))
                 {
-                    if (value) k.SetValue("ForeverPad", "\"" + Program.ExePath + "\"");
+                    if (value) k.SetValue("ForeverPad", "\"" + Program.ExePath + "\" --boot");
                     else k.DeleteValue("ForeverPad", false);
                 }
             }

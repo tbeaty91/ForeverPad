@@ -99,6 +99,36 @@ namespace ForeverPad
             return result;
         }
 
+        // Our shortcut's Exe value from the first account that has it, or null.
+        public static string ShortcutExe()
+        {
+            try
+            {
+                foreach (var cfg in UserConfigDirs())
+                {
+                    string file = Path.Combine(cfg, "shortcuts.vdf");
+                    if (!File.Exists(file)) continue;
+                    var list = Vdf.Read(File.ReadAllBytes(file)).GetMap("shortcuts");
+                    if (list == null) continue;
+                    foreach (var kv in list.Items)
+                    {
+                        var m = kv.Value as Vdf.Map;
+                        if (m != null && (m.GetString("AppName") ?? m.GetString("appname")) == ShortcutName)
+                            return m.GetString("Exe") ?? m.GetString("exe");
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        // True when a shortcut exists but launches some other copy of ForeverPad.
+        public static bool ShortcutIsStale()
+        {
+            var exe = ShortcutExe();
+            return exe != null && !string.Equals(exe.Trim('"'), Program.ExePath, StringComparison.OrdinalIgnoreCase);
+        }
+
         // Adds or updates the shortcut. Returns the number of accounts written.
         public static int AddShortcut(Settings s)
         {

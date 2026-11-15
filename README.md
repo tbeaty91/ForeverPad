@@ -13,6 +13,12 @@ The live `_forever_` folder always holds the active profile's real folders. The 
 
 The first switch to Controller creates the blank slate. By default it copies Normal's `Config.wtf` (login, graphics, sound), then sets `GamePadEnable 1`. You can turn the copy off in Settings.
 
+## Install and update
+
+Run the downloaded `ForeverPad.exe` from anywhere. It copies itself to `%LOCALAPPDATA%\Programs\ForeverPad`, adds a Start Menu shortcut and an Apps & features entry (for uninstalling), starts from there and says so in a tray notification. You can delete the downloaded copy afterwards. Running a newer download installs over the old copy.
+
+It checks this repo's GitHub releases 15 seconds after starting and every 6 hours after that, and offers new versions from a tray notification or from **Check for updates** in the menu. Updating swaps the exe in place, so Steam and Windows startup keep working. Releases come from pushing a `vX.Y.Z` tag. CI builds and attaches `ForeverPad.exe`, and the repo must be public for the updater to see them.
+
 ## Use
 
 1. Run `ForeverPad.exe`. It starts with Windows from then on and asks Normal or Controller at each boot (turn that off in the menu or Settings). It finds `World of Warcraft\_forever_` on its own. If it can't, it opens Settings so you can pick the folder.
@@ -23,4 +29,4 @@ Command line: `ForeverPad.exe --play controller` (what Steam runs) and `ForeverP
 
 ## Build
 
-Run `build.bat` on any Windows 10/11 PC. It uses the C# compiler that ships with Windows, so there's nothing to install. CI builds the exe on every push, and `v*` tags publish a release.
+Run `build.bat` on any Windows 10/11 PC. It uses the C# compiler that ships with Windows, so there's nothing to install. CI builds the exe on every push. Tagging `vX.Y.Z` publishes a release, which installed copies pick up as an update. A local `build.bat` is stamped 0.0.0, so it offers the latest release.

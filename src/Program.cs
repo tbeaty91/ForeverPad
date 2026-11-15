@@ -5,6 +5,8 @@
 //   ForeverPad.exe --play controller   what the Steam shortcut runs: switch, launch,
 //                                      wait for the game to close, switch back
 //   ForeverPad.exe --switch normal|controller
+//   ForeverPad.exe --uninstall         what "Apps & features" runs
+// Run from anywhere else, it installs itself to %LOCALAPPDATA%\Programs\ForeverPad first.
 using System;
 using System.Diagnostics;
 using System.Reflection;
@@ -13,13 +15,18 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("ForeverPad")]
 [assembly: AssemblyProduct("ForeverPad")]
-[assembly: AssemblyVersion("1.0.0.0")]
+// AssemblyVersion comes from Version.g.cs, which build.bat writes.
 
 namespace ForeverPad
 {
     static class Program
     {
         public static string ExePath { get { return Application.ExecutablePath; } }
+        public static System.Version AssemblyVersion { get { return Assembly.GetExecutingAssembly().GetName().Version; } }
+        public static string Version
+        {
+            get { var v = AssemblyVersion; return v.Major + "." + v.Minor + "." + v.Build; }
+        }
 
         [STAThread]
         static int Main(string[] args)
@@ -37,15 +44,31 @@ namespace ForeverPad
                 catch (Exception ex) { MessageBox.Show(ex.Message, "ForeverPad"); return 1; }
             }
 
+            if (mode == "--uninstall") return Installer.Uninstall();
+
+            Installer.CleanupOld();
+            if (!Installer.IsInstalledCopy && mode != "--portable") return Installer.InstallAndRelaunch();
+            if (mode == "--installed" || mode == "--updated") Installer.Register();
+
             bool first;
             using (var m = new Mutex(true, @"Local\ForeverPad.Tray", out first))
             {
                 if (!first)
                 {
-                    MessageBox.Show("ForeverPad is already running. Its icon is in the taskbar tray (check the ^ overflow).", "ForeverPad");
-                    return 0;
+                    // Just installed or updated: the old copy is on its way out, wait for it.
+                    bool got = false;
+                    if (mode == "--installed" || mode == "--updated")
+                    {
+                        try { got = m.WaitOne(15000); }
+                        catch (AbandonedMutexException) { got = true; } // old copy was stopped
+                    }
+                    if (!got)
+                    {
+                        MessageBox.Show("ForeverPad is already running. Its icon is in the taskbar tray (check the ^ overflow).", "ForeverPad");
+                        return 0;
+                    }
                 }
-                Application.Run(new TrayApp(mode == "--boot"));
+                Application.Run(new TrayApp(mode));
                 GC.KeepAlive(m);
             }
             return 0;

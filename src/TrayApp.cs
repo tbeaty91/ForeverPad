@@ -12,11 +12,14 @@ namespace ForeverPad
         readonly NotifyIcon tray = new NotifyIcon();
         readonly Popup popup;
         readonly Timer poll = new Timer { Interval = 2000 };
-        readonly ToolStripMenuItem miNormal, miPad, miBoot;
+        readonly ToolStripMenuItem miNormal, miPad, miBoot, miUpdate;
+        readonly Timer updTimer = new Timer { Interval = 15000 };
+        UpdateInfo pending;
+        string announced;
         string shownActive;
         bool shownRunning;
 
-        public TrayApp(bool boot)
+        public TrayApp(string mode)
         {
             // Boot with the PC by default: on first run, turn it on. On later runs,
             // re-point the Run entry at this exe in case it was moved.
@@ -52,7 +55,17 @@ namespace ForeverPad
             menu.Items.Add("Open folders", null, (o, e) => OpenFolders());
             menu.Items.Add(miBoot);
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Quit", null, (o, e) => Quit());
+            miUpdate = new ToolStripMenuItem("Check for updates", null, (o, e) =>
+            {
+                if (pending != null) PromptUpdate(pending); else CheckForUpdates(true);
+            });
+            menu.Items.Add(miUpdate);
+            menu.Items.Add("Uninstall…", null, (o, e) =>
+            {
+                tray.Visible = false;
+                if (Installer.Uninstall() == 0) Quit(); else tray.Visible = true;
+            });
+            menu.Items.Add("Quit  (v" + Program.Version + ")", null, (o, e) => Quit());
             menu.Opening += (o, e) => { miBoot.Checked = Settings.StartWithWindows; Sync(true); };
             tray.ContextMenuStrip = menu;
 
@@ -70,6 +83,26 @@ namespace ForeverPad
             poll.Start();
             Sync(true);
             tray.Visible = true;
+
+            bool boot = mode == "--boot";
+            if (mode == "--installed")
+            {
+                tray.ShowBalloonTip(6000, "ForeverPad is installed",
+                    "It lives here in the tray (check the ^ arrow) and starts with Windows. Click the icon to switch setups.", ToolTipIcon.Info);
+                if (Steam.ShortcutIsStale())
+                {
+                    var r = MessageBox.Show("Your Steam shortcut \"" + Steam.ShortcutName + "\" still points at the copy you downloaded.\n\n" +
+                        "Open Steam setup and press \"Add to Steam\" to point it at the installed copy?", "ForeverPad",
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (r == DialogResult.Yes) ShowSteamSetup();
+                }
+            }
+            else if (mode == "--updated")
+                tray.ShowBalloonTip(4000, "ForeverPad updated", "Now running v" + Program.Version + ".", ToolTipIcon.Info);
+
+            tray.BalloonTipClicked += (o, e) => { if (pending != null) PromptUpdate(pending); };
+            updTimer.Tick += (o, e) => { updTimer.Interval = 6 * 60 * 60 * 1000; CheckForUpdates(false); };
+            updTimer.Start();
 
             if (boot && s.IsReady) AskAtBoot();
             else if (!s.IsReady)
@@ -130,6 +163,66 @@ namespace ForeverPad
                 pick = f.Choice;
             }
             if (pick != null && pick != Profiles.Active(s.WowDir)) SwitchTo(pick);
+        }
+
+        // ---- Updates (GitHub releases) ----
+        void CheckForUpdates(bool manual)
+        {
+            miUpdate.Enabled = false;
+            var t = new System.Threading.Thread(() =>
+            {
+                UpdateInfo u = null; string err = null;
+                try { u = Updater.Check(); }
+                catch (System.Net.WebException ex)
+                {
+                    var resp = ex.Response as System.Net.HttpWebResponse;
+                    err = resp != null && resp.StatusCode == System.Net.HttpStatusCode.NotFound
+                        ? "No releases found. Either none has been published yet, or the GitHub repo is private and can't be read without signing in."
+                        : "Couldn't reach GitHub: " + ex.Message;
+                }
+                catch (Exception ex) { err = ex.Message; }
+                popup.BeginInvoke(new Action(() => OnChecked(u, err, manual)));
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
+
+        void OnChecked(UpdateInfo u, string err, bool manual)
+        {
+            miUpdate.Enabled = true;
+            if (err != null) { if (manual) MessageBox.Show(err, "ForeverPad"); return; }
+            pending = u;
+            if (u == null)
+            {
+                miUpdate.Text = "Check for updates";
+                if (manual) MessageBox.Show("ForeverPad v" + Program.Version + " is up to date.", "ForeverPad");
+                return;
+            }
+            miUpdate.Text = "Update to " + u.Tag + "…";
+            if (manual) { PromptUpdate(u); return; }
+            if (announced != u.Tag)
+            {
+                announced = u.Tag;
+                tray.ShowBalloonTip(8000, "ForeverPad update", u.Tag + " is available. Click here to install it.", ToolTipIcon.Info);
+            }
+        }
+
+        void PromptUpdate(UpdateInfo u)
+        {
+            string notes = string.IsNullOrEmpty(u.Notes) ? "" : "\n\n" + (u.Notes.Length > 800 ? u.Notes.Substring(0, 800) + "…" : u.Notes);
+            var r = MessageBox.Show("Update ForeverPad from v" + Program.Version + " to " + u.Tag + "?" + notes +
+                "\n\nIt restarts itself in a few seconds. Your setups and settings aren't touched.",
+                "ForeverPad", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (r != DialogResult.Yes) return;
+            try
+            {
+                Updater.Apply(u);
+                Quit();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Update failed: " + ex.Message + "\n\nYou can also download it from " + Updater.ReleasesPage, "ForeverPad");
+            }
         }
 
         public void ShowSettings()

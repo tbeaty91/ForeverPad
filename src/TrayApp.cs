@@ -39,7 +39,7 @@ namespace ForeverPad
             var menu = new ContextMenuStrip();
             miNormal = new ToolStripMenuItem("Normal", null, (o, e) => SwitchTo(Profiles.Normal));
             miPad = new ToolStripMenuItem("Controller", null, (o, e) => SwitchTo(Profiles.Controller));
-            miBoot = new ToolStripMenuItem("Start with Windows", null, (o, e) =>
+            miBoot = new ToolStripMenuItem("Start with Windows (asks at boot)", null, (o, e) =>
             {
                 try { Settings.StartWithWindows = !Settings.StartWithWindows; } catch { }
                 miBoot.Checked = Settings.StartWithWindows;

@@ -83,7 +83,7 @@ namespace ForeverPad
 
             var restore = AddCheck("After a Steam controller session ends, switch back to Normal", s.RestoreAfterPlay, 16, 190, 528);
             var copy = AddCheck("New Controller profile copies Normal's Config.wtf (login, graphics, sound)", s.CopyConfigToController, 16, 216, 528);
-            var boot = AddCheck("Start ForeverPad with Windows", Settings.StartWithWindows, 16, 242, 528);
+            var boot = AddCheck("Start with Windows and ask Normal or Controller", Settings.StartWithWindows, 16, 242, 528);
 
             AddLabel("The Controller profile starts with no addons, keybinds or cache and keeps whatever you add to it.",
                 16, 276, 528, 36, true);

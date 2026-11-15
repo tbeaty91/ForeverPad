@@ -4,7 +4,8 @@
 //   ForeverPad.exe --boot              same, started with Windows: asks which setup to use
 //   ForeverPad.exe --play controller   what the Steam shortcut runs: switch, launch,
 //                                      wait for the game to close, switch back
-//   ForeverPad.exe --switch normal|controller
+//   ForeverPad.exe --play "<profile>"  same for any profile (case doesn't matter)
+//   ForeverPad.exe --switch <profile>
 //   ForeverPad.exe --uninstall         what "Apps & features" runs
 // Run from anywhere else, it installs itself to %LOCALAPPDATA%\Programs\ForeverPad first.
 using System;
@@ -35,12 +36,24 @@ namespace ForeverPad
             Application.SetCompatibleTextRenderingDefault(false);
 
             string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "";
-            string arg = args.Length > 1 ? args[1].ToLowerInvariant() : "";
+            string arg = args.Length > 1 ? string.Join(" ", args, 1, args.Length - 1) : "";
 
-            if (mode == "--play") return Play(arg == "normal" ? Profiles.Normal : Profiles.Controller);
+            if (mode == "--play")
+            {
+                var ps = Settings.Load();
+                return Play(ps.IsReady ? Profiles.Resolve(ps.WowDir, arg, Profiles.Controller) : Profiles.Controller);
+            }
             if (mode == "--switch")
             {
-                try { Profiles.Switch(Settings.Load(), arg == "controller" ? Profiles.Controller : Profiles.Normal); return 0; }
+                try
+                {
+                    var ss = Settings.Load();
+                    if (!ss.IsReady) throw new InvalidOperationException("Set your WoW Forever folder in Settings first.");
+                    string want = Profiles.Resolve(ss.WowDir, arg, null);
+                    if (want == null) throw new InvalidOperationException("There's no profile called \"" + arg + "\".");
+                    Profiles.Switch(ss, want);
+                    return 0;
+                }
                 catch (Exception ex) { MessageBox.Show(ex.Message, "ForeverPad"); return 1; }
             }
 
@@ -84,7 +97,7 @@ namespace ForeverPad
                 return 1;
             }
 
-            var icon = new NotifyIcon { Icon = Icons.For(profile, false), Text = "WoW Forever: " + profile + " session", Visible = true };
+            var icon = new NotifyIcon { Icon = Icons.For(profile, Profiles.IsPad(s.WowDir, profile)), Text = ("WoW Forever: " + profile + " session").Length > 63 ? "WoW Forever session" : "WoW Forever: " + profile + " session", Visible = true };
             int code = 0;
             var ctx = new ApplicationContext();
             var worker = new Thread(() =>

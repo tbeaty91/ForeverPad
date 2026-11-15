@@ -12,11 +12,13 @@ namespace ForeverPad
         readonly NotifyIcon tray = new NotifyIcon();
         readonly Popup popup;
         readonly Timer poll = new Timer { Interval = 2000 };
-        readonly ToolStripMenuItem miNormal, miPad, miBoot, miUpdate;
+        readonly ToolStripMenuItem miBoot, miUpdate;
+        readonly ContextMenuStrip menu = new ContextMenuStrip();
+        readonly System.Collections.Generic.List<ToolStripItem> profileItems = new System.Collections.Generic.List<ToolStripItem>();
         readonly Timer updTimer = new Timer { Interval = 15000 };
         UpdateInfo pending;
         string announced;
-        string shownActive;
+        string shownActive, shownList;
         bool shownRunning;
 
         public TrayApp(string mode)
@@ -39,16 +41,14 @@ namespace ForeverPad
             popup = new Popup(this);
             var popupHandle = popup.Handle; // create the window now so BeginInvoke works
 
-            var menu = new ContextMenuStrip();
-            miNormal = new ToolStripMenuItem("Normal", null, (o, e) => SwitchTo(Profiles.Normal));
-            miPad = new ToolStripMenuItem("Controller", null, (o, e) => SwitchTo(Profiles.Controller));
             miBoot = new ToolStripMenuItem("Start with Windows (asks at boot)", null, (o, e) =>
             {
                 try { Settings.StartWithWindows = !Settings.StartWithWindows; } catch { }
                 miBoot.Checked = Settings.StartWithWindows;
             });
-            menu.Items.Add(miNormal);
-            menu.Items.Add(miPad);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("New profile…", null, (o, e) => ShowNewProfile(null));
+            menu.Items.Add("Manage profiles…", null, (o, e) => ShowManageProfiles());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Steam setup…", null, (o, e) => ShowSteamSetup());
             menu.Items.Add("Settings…", null, (o, e) => ShowSettings());
@@ -117,25 +117,39 @@ namespace ForeverPad
         {
             string active = s.IsReady ? Profiles.Active(s.WowDir) : Profiles.Normal;
             bool running = s.IsReady && Profiles.GameRunning(s);
-            if (!force && active == shownActive && running == shownRunning) return;
+            var names = s.IsReady ? Profiles.List(s.WowDir) : new System.Collections.Generic.List<string> { Profiles.Normal };
+            var pads = names.ConvertAll(n => s.IsReady && Profiles.IsPad(s.WowDir, n));
+            string listKey = string.Join("|", names.ToArray()) + "#" + string.Join(",", pads.ConvertAll(p => p ? "1" : "0").ToArray());
+            if (!force && active == shownActive && running == shownRunning && listKey == shownList) return;
             shownActive = active;
             shownRunning = running;
+            shownList = listKey;
 
             var old = tray.Icon;
-            tray.Icon = Icons.For(active, false);
+            tray.Icon = Icons.For(active, s.IsReady && Profiles.IsPad(s.WowDir, active));
             if (old != null) old.Dispose();
             string tip = "WoW Forever: " + active + (running ? " (game running)" : "");
             tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
 
-            miNormal.Checked = active == Profiles.Normal;
-            miPad.Checked = active == Profiles.Controller;
             bool locked = running || !s.IsReady;
-            miNormal.Enabled = miPad.Enabled = !locked;
+
+            // Profile items sit at the top of the menu, one per profile.
+            foreach (var it in profileItems) { menu.Items.Remove(it); it.Dispose(); }
+            profileItems.Clear();
+            for (int i = 0; i < names.Count; i++)
+            {
+                string target = names[i];
+                var it = new ToolStripMenuItem(target + (pads[i] ? "  (gamepad)" : ""), null, (o, e) => SwitchTo(target));
+                it.Checked = target == active;
+                it.Enabled = !locked;
+                menu.Items.Insert(i, it);
+                profileItems.Add(it);
+            }
 
             string note = !s.IsReady ? "WoW Forever folder not set. Open Settings."
                 : running ? "WoW Forever is running. Close it to switch profiles."
-                : Profiles.Describe(active);
-            popup.SetState(active, note, locked);
+                : Profiles.Describe(s.WowDir, active);
+            popup.SetState(names, pads, active, note, locked);
         }
 
         public void SwitchTo(string target)
@@ -157,7 +171,7 @@ namespace ForeverPad
         {
             if (Profiles.GameRunning(s)) return;
             string pick;
-            using (var f = new BootAsk(Profiles.Active(s.WowDir)))
+            using (var f = new BootAsk(s.WowDir, Profiles.List(s.WowDir), Profiles.Active(s.WowDir)))
             {
                 f.ShowDialog();
                 pick = f.Choice;
@@ -223,6 +237,23 @@ namespace ForeverPad
             {
                 MessageBox.Show("Update failed: " + ex.Message + "\n\nYou can also download it from " + Updater.ReleasesPage, "ForeverPad");
             }
+        }
+
+        public void ShowNewProfile(string copyFrom)
+        {
+            if (!s.IsReady) { ShowSettings(); return; }
+            using (var f = new NewProfileForm(s, copyFrom))
+                if (f.ShowDialog() == DialogResult.OK && f.Created != null)
+                    tray.ShowBalloonTip(2500, "WoW Forever", "Created " + f.Created +
+                        (Profiles.Active(s.WowDir) == f.Created ? " and switched to it." : "."), ToolTipIcon.None);
+            Sync(true);
+        }
+
+        public void ShowManageProfiles()
+        {
+            if (!s.IsReady) { ShowSettings(); return; }
+            using (var f = new ManageProfilesForm(s)) f.ShowDialog();
+            Sync(true);
         }
 
         public void ShowSettings()

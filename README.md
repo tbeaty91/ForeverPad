@@ -7,6 +7,10 @@ A Windows tray toggle that switches **WoW Forever** between two setups:
 
 It also adds a Steam shortcut, **WoW Forever (Controller)**. Launching that shortcut from Steam Link (for example on an Apple TV with a Bluetooth controller) switches WoW to Controller mode, then restarts Battle.net under Steam and launches WoW Forever through it (launch code `WoWF`). Battle.net logs you in, and because WoW is part of the Steam launch, Steam Input still reads your controller. When you quit, it closes that Battle.net, reopens it normally if it was open before, and switches back to Normal. Clear the launch code in Settings to start the game exe directly instead (that asks for a login).
 
+## More profiles
+
+Normal and Controller are always there. **+ New profile…** in the tray popup makes more. A new profile can start **blank** or as a **copy** of any profile's addons, keybinds and settings. Use a copy to try new addons, because the original is only read and never changes. Each profile has its own colour in the tray and can turn gamepad mode on or off. **Manage…** switches, duplicates, renames, deletes (to the Recycle Bin) and sets gamepad mode. Normal and Controller can't be renamed or deleted. `--play "<profile>"` and `--switch <profile>` take any profile name.
+
 ## How switching works
 
 The live `_forever_` folder always holds the active profile's real folders. The inactive profile is parked in `World of Warcraft\_forever__profiles\<Name>\`. A switch renames those folders on the same drive, so it's instant and nothing gets deleted. If any rename fails, the ones already done are undone. You can't switch while the game is running.

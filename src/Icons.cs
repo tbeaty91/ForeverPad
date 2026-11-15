@@ -16,9 +16,19 @@ namespace ForeverPad
         public static readonly Color PadAccent = Color.FromArgb(46, 196, 120);
         public static readonly Color Warn = Color.FromArgb(240, 170, 60);
 
+        // Normal is blue and Controller green; every other profile gets a steady
+        // colour of its own, so a glance at the tray says you're not on Normal.
+        static readonly Color[] Extra = {
+            Color.FromArgb(168, 110, 255), Color.FromArgb(240, 140, 60), Color.FromArgb(232, 90, 150),
+            Color.FromArgb(40, 190, 200), Color.FromArgb(200, 180, 50), Color.FromArgb(120, 140, 255) };
+
         public static Color AccentFor(string profile)
         {
-            return profile == Profiles.Controller ? PadAccent : NormalAccent;
+            if (profile == Profiles.Normal) return NormalAccent;
+            if (profile == Profiles.Controller) return PadAccent;
+            int h = 0;
+            foreach (char c in (profile ?? "").ToLowerInvariant()) h = h * 31 + c;
+            return Extra[(h & 0x7fffffff) % Extra.Length];
         }
 
         public static GraphicsPath Rounded(RectangleF r, float rad)
@@ -38,8 +48,9 @@ namespace ForeverPad
     {
         [DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr h);
 
-        public static Icon For(string profile, bool busy)
+        public static Icon For(string profile, bool pad)
         {
+            var accent = Theme.AccentFor(profile);
             const int S = 32;
             using (var bmp = new Bitmap(S, S))
             {
@@ -47,11 +58,11 @@ namespace ForeverPad
                 {
                     g.SmoothingMode = SmoothingMode.AntiAlias;
                     g.Clear(Color.Transparent);
-                    using (var bg = new SolidBrush(busy ? Theme.Warn : Theme.AccentFor(profile)))
+                    using (var bg = new SolidBrush(accent))
                     using (var path = Theme.Rounded(new RectangleF(1, 1, S - 2, S - 2), 7))
                         g.FillPath(bg, path);
-                    if (profile == Profiles.Controller) DrawPad(g, Color.White);
-                    else DrawKeys(g, Color.White);
+                    if (pad) DrawPad(g, Color.White, accent);
+                    else DrawKeys(g, Color.White, accent);
                 }
                 IntPtr h = bmp.GetHicon();
                 var icon = (Icon)Icon.FromHandle(h).Clone();
@@ -61,10 +72,10 @@ namespace ForeverPad
         }
 
         // A simple gamepad silhouette with a d-pad and two buttons cut out.
-        static void DrawPad(Graphics g, Color c)
+        static void DrawPad(Graphics g, Color c, Color accent)
         {
             using (var b = new SolidBrush(c))
-            using (var cut = new SolidBrush(Theme.PadAccent))
+            using (var cut = new SolidBrush(accent))
             {
                 using (var body = Theme.Rounded(new RectangleF(4, 9, 24, 13), 6.5f)) g.FillPath(b, body);
                 g.FillEllipse(b, 4, 15, 9, 11);
@@ -77,12 +88,12 @@ namespace ForeverPad
         }
 
         // A keyboard: outline with rows of keys.
-        static void DrawKeys(Graphics g, Color c)
+        static void DrawKeys(Graphics g, Color c, Color accent)
         {
             using (var b = new SolidBrush(c))
             {
                 using (var body = Theme.Rounded(new RectangleF(4, 9, 24, 15), 3)) g.FillPath(b, body);
-                using (var k = new SolidBrush(Theme.NormalAccent))
+                using (var k = new SolidBrush(accent))
                 {
                     for (int i = 0; i < 5; i++) g.FillRectangle(k, 6.5f + i * 4, 11.5f, 2.5f, 2.5f);
                     for (int i = 0; i < 5; i++) g.FillRectangle(k, 6.5f + i * 4, 15.5f, 2.5f, 2.5f);

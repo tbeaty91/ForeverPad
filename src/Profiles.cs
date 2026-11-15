@@ -38,18 +38,157 @@ namespace ForeverPad
                 if (File.Exists(f))
                 {
                     var v = File.ReadAllText(f).Trim();
-                    if (v == Controller) return Controller;
+                    if (v != "" && NameError(v) == null) return v;
                 }
             }
             catch { }
             return Normal;
         }
 
-        public static string Describe(string profile)
+        // ---- The profile list ----
+        // Normal and Controller always exist (Controller is built on first use).
+        // Any other profile is a folder in the store; a profile's folder stays
+        // there even while it's active (it then only holds profile.ini).
+        public static List<string> List(string wowDir)
         {
-            return profile == Controller
-                ? "Controller — its own addons, keybinds and settings, gamepad on"
-                : "Normal — your usual addons, keybinds and settings";
+            var names = new List<string> { Normal, Controller };
+            try
+            {
+                var store = StoreRoot(wowDir);
+                if (Directory.Exists(store))
+                    foreach (var d in Directory.GetDirectories(store).Select(Path.GetFileName).OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
+                        if (!names.Any(n => n.Equals(d, StringComparison.OrdinalIgnoreCase))) names.Add(d);
+            }
+            catch { }
+            var act = Active(wowDir);
+            if (!names.Contains(act)) names.Add(act);
+            return names;
+        }
+
+        public static bool IsBuiltIn(string name) { return name == Normal || name == Controller; }
+
+        // Match a typed name (e.g. a Steam launch argument) to a real profile.
+        public static string Resolve(string wowDir, string typed, string fallback)
+        {
+            if (string.IsNullOrEmpty(typed)) return fallback;
+            var hit = List(wowDir).FirstOrDefault(n => n.Equals(typed.Trim(), StringComparison.OrdinalIgnoreCase));
+            return hit ?? fallback;
+        }
+
+        public static string NameError(string name)
+        {
+            name = (name ?? "").Trim();
+            if (name == "") return "Give the profile a name.";
+            if (name.Length > 40) return "Keep the name under 40 characters.";
+            if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || name.StartsWith(".") || name.EndsWith("."))
+                return "A profile name can't contain \\ / : * ? \" < > | or start or end with a dot.";
+            return null;
+        }
+
+        static string IniPath(string wowDir, string name) { return Path.Combine(StoreRoot(wowDir), name, "profile.ini"); }
+
+        // true = turn gamepad mode on when switching to it, false = turn it off,
+        // null = leave it alone (Normal, unless you've changed it).
+        public static bool? Gamepad(string wowDir, string name)
+        {
+            try
+            {
+                var f = IniPath(wowDir, name);
+                if (File.Exists(f))
+                    foreach (var l in File.ReadAllLines(f))
+                        if (l.StartsWith("gamepad=")) return l.EndsWith("1");
+            }
+            catch { }
+            if (name == Controller) return true;
+            return null;
+        }
+
+        public static bool IsPad(string wowDir, string name) { return Gamepad(wowDir, name) == true; }
+
+        public static void SetGamepad(string wowDir, string name, bool on)
+        {
+            var f = IniPath(wowDir, name);
+            Directory.CreateDirectory(Path.GetDirectoryName(f));
+            File.WriteAllText(f, "gamepad=" + (on ? "1" : "0") + "\r\n");
+        }
+
+        public static string Describe(string wowDir, string profile)
+        {
+            if (profile == Normal) return "Normal — your main addons, keybinds and settings";
+            return profile + " — its own addons, keybinds and settings" + (IsPad(wowDir, profile) ? ", gamepad on" : "");
+        }
+
+        // Where a profile's Interface/WTF/Cache live right now.
+        static string FolderOf(string wowDir, string name, string sub)
+        {
+            return Active(wowDir) == name ? Path.Combine(wowDir, sub) : Path.Combine(StoreRoot(wowDir), name, sub);
+        }
+
+        // New profile: blank (no addons, keybinds or cache) or a copy of another
+        // profile's Interface + WTF. The source is only read, never moved.
+        public static void Create(Settings s, string name, string copyFrom, bool gamepad, Action<string> progress)
+        {
+            name = name.Trim();
+            var err = NameError(name);
+            if (err != null) throw new InvalidOperationException(err);
+            if (List(s.WowDir).Any(n => n.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("There's already a profile called " + name + ".");
+            if (copyFrom != null && copyFrom == Active(s.WowDir) && GameRunning(s))
+                throw new InvalidOperationException("Close WoW Forever first: " + copyFrom + " is in use.");
+
+            string dir = Path.Combine(StoreRoot(s.WowDir), name);
+            try
+            {
+                Directory.CreateDirectory(dir);
+                if (copyFrom == null) SeedBlank(s, dir);
+                else
+                {
+                    foreach (var sub in new[] { "Interface", "WTF" })
+                    {
+                        string src = FolderOf(s.WowDir, copyFrom, sub);
+                        if (!Directory.Exists(src)) continue;
+                        if (progress != null) progress("Copying " + copyFrom + "'s " + sub + "…");
+                        CopyTree(src, Path.Combine(dir, sub));
+                    }
+                }
+                SetGamepad(s.WowDir, name, gamepad);
+            }
+            catch
+            {
+                try { Directory.Delete(dir, true); } catch { }
+                throw;
+            }
+        }
+
+        static void CopyTree(string src, string dst)
+        {
+            Directory.CreateDirectory(dst);
+            foreach (var f in Directory.GetFiles(src)) File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), false);
+            foreach (var d in Directory.GetDirectories(src)) CopyTree(d, Path.Combine(dst, Path.GetFileName(d)));
+        }
+
+        public static void Rename(Settings s, string from, string to)
+        {
+            to = to.Trim();
+            if (IsBuiltIn(from)) throw new InvalidOperationException(from + " can't be renamed.");
+            if (from == Active(s.WowDir)) throw new InvalidOperationException("Switch to another profile before renaming " + from + ".");
+            var err = NameError(to);
+            if (err != null) throw new InvalidOperationException(err);
+            if (List(s.WowDir).Any(n => n.Equals(to, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("There's already a profile called " + to + ".");
+            Directory.Move(Path.Combine(StoreRoot(s.WowDir), from), Path.Combine(StoreRoot(s.WowDir), to));
+        }
+
+        // Deleted profiles go to the Recycle Bin, so a mistake can be undone.
+        public static void Delete(Settings s, string name)
+        {
+            if (IsBuiltIn(name)) throw new InvalidOperationException(name + " can't be deleted.");
+            if (name == Active(s.WowDir)) throw new InvalidOperationException("Switch to another profile before deleting " + name + ".");
+            string dir = Path.Combine(StoreRoot(s.WowDir), name);
+            if (!Directory.Exists(dir)) return;
+            Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(dir,
+                Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
         }
 
         // ---- Is the game running? ----
@@ -109,7 +248,10 @@ namespace ForeverPad
 
                 // First time into Controller mode: build the blank slate.
                 if (target == Controller && !Directory.Exists(fromDir))
-                    SeedController(s, fromDir);
+                {
+                    SeedBlank(s, fromDir);
+                    SetGamepad(wow, Controller, true);
+                }
 
                 var done = new List<string[]>(); // {from, to}
                 try
@@ -141,8 +283,10 @@ namespace ForeverPad
                 }
             }
 
-            if (target == Controller)
-                SetCvar(Path.Combine(wow, "WTF", "Config.wtf"), "GamePadEnable", "1");
+            var pad = Gamepad(wow, target);
+            string cfg = Path.Combine(wow, "WTF", "Config.wtf");
+            if (pad == true) SetCvar(cfg, "GamePadEnable", "1");
+            else if (pad == false && File.Exists(cfg)) SetCvar(cfg, "GamePadEnable", "0");
         }
 
         static void Move(string from, string to, List<string[]> done)
@@ -152,20 +296,18 @@ namespace ForeverPad
         }
 
         // Blank slate: no addons, no keybinds, no saved variables, no cache.
-        // Config.wtf is copied from Normal (login, graphics, audio) unless the
-        // user turned that off, then gamepad mode is switched on.
-        static void SeedController(Settings s, string dir)
+        // Config.wtf (login, graphics, audio) is copied from the live profile
+        // unless the user turned that off.
+        static void SeedBlank(Settings s, string dir)
         {
             Directory.CreateDirectory(Path.Combine(dir, "WTF"));
             Directory.CreateDirectory(Path.Combine(dir, "Interface", "AddOns"));
             string dst = Path.Combine(dir, "WTF", "Config.wtf");
             if (s.CopyConfigToController)
             {
-                // Normal is the live profile whenever Controller doesn't exist yet.
                 string src = Path.Combine(s.WowDir, "WTF", "Config.wtf");
                 if (File.Exists(src)) File.Copy(src, dst, false);
             }
-            SetCvar(dst, "GamePadEnable", "1");
         }
 
         // Set (or add) `SET name "value"` in a Config.wtf.

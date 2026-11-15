@@ -131,13 +131,13 @@ namespace ForeverPad
         {
             var s = Settings.Load();
             var ok = MessageBox.Show(
-                "Uninstall ForeverPad?\n\nYour WoW folders are left alone. If Controller is active it switches back to Normal first. " +
-                "The parked Controller setup stays in the _forever__profiles folder next to _forever_, so you can delete it yourself if you want." +
+                "Uninstall ForeverPad?\n\nYour WoW folders are left alone. If another profile is active it switches back to Normal first. " +
+                "Your other profiles stay in the _forever__profiles folder next to _forever_, so you can delete it yourself if you want." +
                 "\n\nThe \"" + Steam.ShortcutName + "\" entry in Steam stays too; remove it from Steam if you don't want it.",
                 "ForeverPad", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
             if (ok != DialogResult.OK) return 1;
 
-            if (s.IsReady && Profiles.Active(s.WowDir) == Profiles.Controller)
+            if (s.IsReady && Profiles.Active(s.WowDir) != Profiles.Normal)
             {
                 try { Profiles.Switch(s, Profiles.Normal); }
                 catch (Exception ex)

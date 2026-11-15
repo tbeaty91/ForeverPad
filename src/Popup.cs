@@ -1,67 +1,75 @@
-// ForeverPad — the toggle that pops up above the tray icon.
+// ForeverPad — the profile picker that pops up above the tray icon.
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace ForeverPad
 {
-    // Two-segment pill switch: Normal | Controller.
-    class ModeSwitch : Control
+    // One clickable row per profile: colour chip, glyph, name, "active" tag.
+    class ProfileRow : Control
     {
-        public string Value = Profiles.Normal;
-        public bool Locked;
-        public event Action<string> Picked;
+        public string Profile;
+        public bool Pad, IsActive, Locked;
+        bool hover;
 
-        public ModeSwitch()
+        public ProfileRow()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
             Cursor = Cursors.Hand;
-            Font = new Font("Segoe UI Semibold", 10.5f);
+            Font = new Font("Segoe UI Semibold", 10f);
         }
+
+        protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(Theme.Bg);
+            var accent = Theme.AccentFor(Profile);
             var r = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1);
-            using (var p = Theme.Rounded(r, Height / 2f - 1))
-            using (var b = new SolidBrush(Theme.Panel))
+            Color fill = IsActive ? (Locked ? Color.FromArgb(90, 94, 104) : accent)
+                       : hover && !Locked ? Color.FromArgb(52, 56, 66) : Theme.Panel;
+            using (var p = Theme.Rounded(r, 8))
+            using (var b = new SolidBrush(fill))
                 g.FillPath(b, p);
 
-            float half = Width / 2f;
-            bool pad = Value == Profiles.Controller;
-            var knob = new RectangleF(pad ? half + 2 : 3, 3, half - 5, Height - 6);
-            using (var p = Theme.Rounded(knob, knob.Height / 2f))
-            using (var b = new SolidBrush(Locked ? Color.FromArgb(90, 94, 104) : Theme.AccentFor(Value)))
-                g.FillPath(b, p);
+            using (var ico = Icons.For(Profile, Pad))
+                g.DrawIcon(ico, new Rectangle(8, (Height - 24) / 2, 24, 24));
 
-            var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            using (var on = new SolidBrush(Color.White))
-            using (var off = new SolidBrush(Theme.Dim))
+            var fmt = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap };
+            using (var t = new SolidBrush(IsActive ? Color.White : Theme.Text))
+                g.DrawString(Profile, Font, t, new RectangleF(40, 0, Width - 120, Height), fmt);
+
+            string tag = IsActive ? "active" : Pad ? "gamepad" : "";
+            if (tag != "")
             {
-                g.DrawString("Normal", Font, pad ? off : on, new RectangleF(0, 0, half, Height), fmt);
-                g.DrawString("Controller", Font, pad ? on : off, new RectangleF(half, 0, half, Height), fmt);
+                using (var f = new Font("Segoe UI", 8.5f))
+                using (var t = new SolidBrush(IsActive ? Color.FromArgb(230, 255, 255, 255) : Theme.Dim))
+                {
+                    var right = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center };
+                    g.DrawString(tag, f, t, new RectangleF(0, 0, Width - 12, Height), right);
+                }
             }
-        }
-
-        protected override void OnMouseClick(MouseEventArgs e)
-        {
-            if (Locked) return;
-            string v = e.X < Width / 2 ? Profiles.Normal : Profiles.Controller;
-            if (v != Value && Picked != null) Picked(v);
         }
     }
 
     class Popup : Form
     {
         readonly TrayApp app;
-        readonly ModeSwitch sw = new ModeSwitch();
         readonly Label status = new Label();
         readonly Label title = new Label();
+        readonly List<Control> rows = new List<Control>();
+        readonly List<Control> footer = new List<Control>();
         public DateTime HiddenAt = DateTime.MinValue;
+        string activeShown = Profiles.Normal;
+        string layoutKey = "";
+
+        const int W = 340, Gutter = 16, RowH = 38, RowGap = 6;
 
         public Popup(TrayApp app)
         {
@@ -73,33 +81,26 @@ namespace ForeverPad
             BackColor = Theme.Bg;
             ForeColor = Theme.Text;
             Font = new Font("Segoe UI", 9f);
-            ClientSize = new Size(340, 196);
-            Padding = new Padding(1);
+            ClientSize = new Size(W, 200);
 
-            title.Text = "WoW Forever setup";
+            title.Text = "WoW Forever profile";
             title.Font = new Font("Segoe UI Semibold", 11f);
             title.ForeColor = Theme.Text;
-            title.SetBounds(16, 12, 300, 22);
+            title.SetBounds(Gutter, 12, W - 2 * Gutter, 22);
             Controls.Add(title);
 
-            sw.SetBounds(16, 42, 308, 40);
-            sw.Picked += v => app.SwitchTo(v);
-            Controls.Add(sw);
-
             status.ForeColor = Theme.Dim;
-            status.SetBounds(16, 90, 308, 38);
             Controls.Add(status);
 
-            int x = 16;
-            x = AddLink("Steam setup…", x, () => { Hide(); app.ShowSteamSetup(); });
-            x = AddLink("Settings…", x, () => { Hide(); app.ShowSettings(); });
-            x = AddLink("Open folders", x, () => { Hide(); app.OpenFolders(); });
-            AddLink("Quit", x, () => app.Quit());
+            footer.Add(MakeLink("+ New profile…", () => { Hide(); app.ShowNewProfile(null); }));
+            footer.Add(MakeLink("Manage…", () => { Hide(); app.ShowManageProfiles(); }));
+            footer.Add(MakeLink("Steam setup…", () => { Hide(); app.ShowSteamSetup(); }));
+            footer.Add(MakeLink("Settings…", () => { Hide(); app.ShowSettings(); }));
 
             Deactivate += (s, e) => { HiddenAt = DateTime.Now; Hide(); };
         }
 
-        int AddLink(string text, int x, Action click)
+        Button MakeLink(string text, Action click)
         {
             var b = new Button
             {
@@ -110,27 +111,61 @@ namespace ForeverPad
                 Cursor = Cursors.Hand,
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Padding = new Padding(4, 1, 4, 1),
+                Padding = new Padding(3, 1, 3, 1),
             };
             b.FlatAppearance.BorderSize = 0;
-            b.Location = new Point(x, 144);
             b.Click += (s, e) => click();
             Controls.Add(b);
-            return x + b.PreferredSize.Width + 6;
+            return b;
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            using (var p = new Pen(Theme.AccentFor(sw.Value), 2))
+            using (var p = new Pen(Theme.AccentFor(activeShown), 2))
                 e.Graphics.DrawRectangle(p, 1, 1, Width - 2, Height - 2);
         }
 
-        public void SetState(string active, string note, bool locked)
+        // pads[i] = whether profiles[i] turns gamepad mode on.
+        public void SetState(List<string> profiles, List<bool> pads, string active, string note, bool locked)
         {
-            sw.Value = active;
-            sw.Locked = locked;
-            sw.Invalidate();
+            activeShown = active;
+
+            // Rebuild the rows only when something about them changed.
+            var key = string.Join("|", profiles.ToArray()) + "#" + active + "#" + locked + "#" +
+                      string.Join(",", pads.ConvertAll(p => p ? "1" : "0").ToArray());
+            if (key != layoutKey)
+            {
+                layoutKey = key;
+                foreach (var r in rows) { Controls.Remove(r); r.Dispose(); }
+                rows.Clear();
+                int y = 42;
+                for (int i = 0; i < profiles.Count; i++)
+                {
+                    string target = profiles[i];
+                    var row = new ProfileRow { Profile = target, Pad = pads[i], IsActive = target == active, Locked = locked };
+                    row.SetBounds(Gutter, y, W - 2 * Gutter, RowH);
+                    // Switch after the click finishes: switching rebuilds (disposes) these rows.
+                    row.Click += (s, e) => { if (!locked && target != activeShown) BeginInvoke(new Action(() => app.SwitchTo(target))); };
+                    Controls.Add(row);
+                    rows.Add(row);
+                    y += RowH + RowGap;
+                }
+
+                status.SetBounds(Gutter, y + 2, W - 2 * Gutter, 36);
+                y += 44;
+
+                int x = Gutter;
+                foreach (var b in footer)
+                {
+                    int w = b.PreferredSize.Width;
+                    if (x + w > W - Gutter) { x = Gutter; y += 32; }
+                    b.Location = new Point(x, y);
+                    x += w + 6;
+                }
+                ClientSize = new Size(W, y + 30 + 12);
+            }
+
             status.Text = note;
             status.ForeColor = locked ? Theme.Warn : Theme.Dim;
             Invalidate();

@@ -275,9 +275,11 @@ namespace ForeverPad
             }
             int yq = 152 + ((PartOrder.Length + 1) / 2) * 26 + 4;
             Action<Part> setTicks = want => { for (int i = 0; i < boxes.Count; i++) boxes[i].Checked = (want & PartOrder[i]) != 0; };
-            var bKeys = AddButton("Just keybindings", 16, yq, 140, Theme.Panel, (o, e) => setTicks(Part.Keybinds));
-            var bAll = AddButton("Everything", 162, yq, 100, Theme.Panel, (o, e) => setTicks(Part.All));
-            var bNone = AddButton("None", 268, yq, 70, Theme.Panel, (o, e) => setTicks(Part.None));
+            var bKeys = AddButton("Just keybindings", 16, yq, 118, Theme.Panel, (o, e) => setTicks(Part.Keybinds));
+            var bNoAddons = AddButton("Everything but addons", 140, yq, 150, Theme.Panel,
+                (o, e) => setTicks(Part.All & ~(Part.Addons | Part.AddonSettings)));
+            var bAll = AddButton("Everything", 296, yq, 86, Theme.Panel, (o, e) => setTicks(Part.All));
+            var bNone = AddButton("None", 388, yq, 56, Theme.Panel, (o, e) => setTicks(Part.None));
 
             int y = yq + 44;
             var pad = AddCheck("Gamepad mode on when this profile is active", Profiles.IsPad(s.WowDir, src0), 16, y, 428);
@@ -289,7 +291,7 @@ namespace ForeverPad
             Action sync = () =>
             {
                 bool any = from.SelectedIndex > 0;
-                partsLabel.Enabled = bKeys.Enabled = bAll.Enabled = bNone.Enabled = any;
+                partsLabel.Enabled = bKeys.Enabled = bNoAddons.Enabled = bAll.Enabled = bNone.Enabled = any;
                 foreach (var c in boxes) c.Enabled = any;
             };
             from.SelectedIndexChanged += (o, e) =>

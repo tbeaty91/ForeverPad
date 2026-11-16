@@ -18,6 +18,7 @@ namespace ForeverPad
         public bool CopyConfigToController = true; // seed controller Config.wtf from Normal
         public bool RestartCurseForge = true;      // close CurseForge before a switch, reopen after
         public int NewProfileParts = 1 | 4;         // remembered New-profile ticks: keybinds + game settings
+        public bool AskAtBoot = true;               // when started with Windows, ask which profile to use
 
         public static string Dir
         {
@@ -44,6 +45,7 @@ namespace ForeverPad
                         else if (k == "RestoreAfterPlay") s.RestoreAfterPlay = v == "1";
                         else if (k == "CopyConfigToController") s.CopyConfigToController = v == "1";
                         else if (k == "RestartCurseForge") s.RestartCurseForge = v == "1";
+                        else if (k == "AskAtBoot") s.AskAtBoot = v == "1";
                         else if (k == "NewProfileParts") { int n; if (int.TryParse(v, out n)) s.NewProfileParts = n; }
                     }
                 }
@@ -66,6 +68,7 @@ namespace ForeverPad
                 "CopyConfigToController=" + (CopyConfigToController ? "1" : "0"),
                 "RestartCurseForge=" + (RestartCurseForge ? "1" : "0"),
                 "NewProfileParts=" + NewProfileParts,
+                "AskAtBoot=" + (AskAtBoot ? "1" : "0"),
             });
         }
 

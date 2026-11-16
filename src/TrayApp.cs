@@ -12,7 +12,7 @@ namespace ForeverPad
         readonly NotifyIcon tray = new NotifyIcon();
         readonly Popup popup;
         readonly Timer poll = new Timer { Interval = 2000 };
-        readonly ToolStripMenuItem miBoot, miUpdate;
+        readonly ToolStripMenuItem miBoot, miAsk, miUpdate;
         readonly ContextMenuStrip menu = new ContextMenuStrip();
         readonly System.Collections.Generic.List<ToolStripItem> profileItems = new System.Collections.Generic.List<ToolStripItem>();
         readonly Timer updTimer = new Timer { Interval = 15000 };
@@ -41,10 +41,16 @@ namespace ForeverPad
             popup = new Popup(this);
             var popupHandle = popup.Handle; // create the window now so BeginInvoke works
 
-            miBoot = new ToolStripMenuItem("Start with Windows (asks at boot)", null, (o, e) =>
+            miBoot = new ToolStripMenuItem("Start with Windows", null, (o, e) =>
             {
                 try { Settings.StartWithWindows = !Settings.StartWithWindows; } catch { }
-                miBoot.Checked = Settings.StartWithWindows;
+                SyncBootItems();
+            });
+            miAsk = new ToolStripMenuItem("Ask which profile at startup", null, (o, e) =>
+            {
+                s.AskAtBoot = !s.AskAtBoot;
+                try { s.Save(); } catch { }
+                SyncBootItems();
             });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("New profile…", null, (o, e) => ShowNewProfile(null));
@@ -54,6 +60,7 @@ namespace ForeverPad
             menu.Items.Add("Settings…", null, (o, e) => ShowSettings());
             menu.Items.Add("Open folders", null, (o, e) => OpenFolders());
             menu.Items.Add(miBoot);
+            menu.Items.Add(miAsk);
             menu.Items.Add("CurseForge diagnostic…", null, (o, e) => ShowCurseForgeProbe());
             menu.Items.Add(new ToolStripSeparator());
             miUpdate = new ToolStripMenuItem("Check for updates", null, (o, e) =>
@@ -67,7 +74,7 @@ namespace ForeverPad
                 if (Installer.Uninstall() == 0) Quit(); else tray.Visible = true;
             });
             menu.Items.Add("Quit  (v" + Program.Version + ")", null, (o, e) => Quit());
-            menu.Opening += (o, e) => { miBoot.Checked = Settings.StartWithWindows; Sync(true); };
+            menu.Opening += (o, e) => { SyncBootItems(); Sync(true); };
             tray.ContextMenuStrip = menu;
 
             tray.MouseClick += (o, e) =>
@@ -105,7 +112,7 @@ namespace ForeverPad
             updTimer.Tick += (o, e) => { updTimer.Interval = 6 * 60 * 60 * 1000; CheckForUpdates(false); };
             updTimer.Start();
 
-            if (boot && s.IsReady) AskAtBoot();
+            if (boot && s.IsReady && s.AskAtBoot) AskAtBoot();
             else if (!s.IsReady)
             {
                 tray.ShowBalloonTip(4000, "ForeverPad", "Couldn't find WoW Forever. Pick its folder in Settings.", ToolTipIcon.Info);
@@ -165,6 +172,16 @@ namespace ForeverPad
                 MessageBox.Show(ex.Message, "ForeverPad", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             Sync(true);
+        }
+
+        // The ask-at-startup choice only matters when ForeverPad starts with Windows.
+        void SyncBootItems()
+        {
+            bool on = false;
+            try { on = Settings.StartWithWindows; } catch { }
+            miBoot.Checked = on;
+            miAsk.Checked = s.AskAtBoot;
+            miAsk.Enabled = on;
         }
 
         // Started with Windows: ask which setup to use for this session.

@@ -61,7 +61,7 @@ namespace ForeverPad
 
     class SettingsForm : DarkForm
     {
-        public SettingsForm(Settings s) : base("ForeverPad settings", 560, 406)
+        public SettingsForm(Settings s) : base("ForeverPad settings", 560, 432)
         {
             AddLabel("WoW Forever folder (the one named _forever_)", 16, 14, 520, 20, false);
             var dir = AddBox(s.WowDir, 16, 36, 430);
@@ -87,13 +87,16 @@ namespace ForeverPad
 
             var restore = AddCheck("After a Steam controller session ends, switch back to Normal", s.RestoreAfterPlay, 16, 190, 528);
             var copy = AddCheck("Blank profiles copy the current Config.wtf (login, graphics, sound)", s.CopyConfigToController, 16, 216, 528);
-            var boot = AddCheck("Start with Windows and ask Normal or Controller", Settings.StartWithWindows, 16, 242, 528);
-            var cf = AddCheck("Close CurseForge before switching and reopen it after, so it shows the new profile's addons", s.RestartCurseForge, 16, 268, 528);
+            var boot = AddCheck("Start with Windows", Settings.StartWithWindows, 16, 242, 528);
+            var ask = AddCheck("At startup, ask which profile to use", s.AskAtBoot, 36, 268, 508);
+            ask.Enabled = boot.Checked;
+            boot.CheckedChanged += (o, e) => ask.Enabled = boot.Checked;
+            var cf = AddCheck("Close CurseForge before switching and reopen it after, so it shows the new profile's addons", s.RestartCurseForge, 16, 294, 528);
 
             AddLabel("A blank profile starts with no addons, keybinds or cache and keeps whatever you add to it. Make more from the tray: + New profile.",
-                16, 302, 528, 36, true);
+                16, 328, 528, 36, true);
 
-            AddButton("Save", 360, 356, 90, Theme.NormalAccent, (o, e) =>
+            AddButton("Save", 360, 382, 90, Theme.NormalAccent, (o, e) =>
             {
                 if (!Settings.IsWowDir(dir.Text))
                 {
@@ -106,12 +109,13 @@ namespace ForeverPad
                 s.RestoreAfterPlay = restore.Checked;
                 s.CopyConfigToController = copy.Checked;
                 s.RestartCurseForge = cf.Checked;
+                s.AskAtBoot = ask.Checked;
                 s.Save();
                 try { Settings.StartWithWindows = boot.Checked; } catch { }
                 DialogResult = DialogResult.OK;
                 Close();
             });
-            AddButton("Cancel", 456, 356, 90, Theme.Panel, (o, e) => Close());
+            AddButton("Cancel", 456, 382, 90, Theme.Panel, (o, e) => Close());
 
             if (s.WowDir != "" && s.GameExe == "") exe.Text = Settings.DetectGameExe(s.WowDir) ?? "";
             dir.TextChanged += (o, e) => { var d = Settings.DetectGameExe(dir.Text); if (d != null) exe.Text = d; };

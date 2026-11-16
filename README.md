@@ -29,7 +29,7 @@ It checks this repo's GitHub releases 15 seconds after starting and every 6 hour
 
 ## Use
 
-1. Run `ForeverPad.exe`. It starts with Windows from then on and asks Normal or Controller at each boot (turn that off in the menu or Settings). It finds `World of Warcraft\_forever_` on its own. If it can't, it opens Settings so you can pick the folder.
+1. Run `ForeverPad.exe`. It starts with Windows from then on and asks which profile to use at each boot. "Start with Windows" and "Ask which profile at startup" are separate switches in the tray menu and Settings, so it can start quietly on whatever profile was last active. It finds `World of Warcraft\_forever_` on its own. If it can't, it opens Settings so you can pick the folder.
 2. Left-click the tray icon to open the toggle. Right-click it for the menu.
 3. Open **Steam setup… → Add to Steam**. ForeverPad closes Steam if needed, then writes the shortcut and keeps a `shortcuts.vdf.foreverpad-backup`.
 
